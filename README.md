@@ -1,6 +1,6 @@
 # minui-nintendo-ds-pak
 
-A work-in-progress pak for Nintendo DS.
+A MinUI Emu Pak for Nintendo DS, wrapping the standalone Advanced Drastic Nintendo DS emulator (version 1.0.8).
 
 ## Requirements
 
