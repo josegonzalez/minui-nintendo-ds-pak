@@ -34,6 +34,11 @@ Use the correct platform for your device.
 - Select + L: Quick load
 - Select + R: Quick save
 
+## Saves & States
+
+- Save states are stored in the `/.userdata/shared/NDS-advanced-drastic/` directory.
+- Game saves are stored in the `/Saves/NDS/` directory.
+
 ## Credits
 
 - @trngaje for maintaining Advanced Drastic and related projects
