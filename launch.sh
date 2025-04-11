@@ -57,7 +57,6 @@ main() {
     mkdir -p "$EMU_DIR/savestates"
     mount -o bind "$SHARED_USERDATA_PATH/NDS-advanced-drastic" "$EMU_DIR/savestates"
 
-
     "$EMU_DIR/drastic" "$*"
 }
 
