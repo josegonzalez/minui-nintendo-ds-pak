@@ -34,6 +34,10 @@ Use the correct platform for your device.
 - Select + L: Quick load
 - Select + R: Quick save
 
+## Deep Sleep & Shutdown
+
+Deep sleep is supported on compatible devices. Click the power button to enter deep sleep. Click again to resume the game. To shut down, hold the power button for 2 seconds. **Note:** Shutdown does not save or resume the game and any unsaved progress will be lost. For more information and issues, see [MinUI Power Control](https://github.com/ben16w/minui-power-control).
+
 ## Saves & States
 
 - Save states are stored in the `/.userdata/shared/NDS-advanced-drastic/` directory.
