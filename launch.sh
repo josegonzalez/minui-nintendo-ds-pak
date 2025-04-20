@@ -46,6 +46,7 @@ main() {
     cd "$EMU_DIR"
     export HOME="$EMU_DIR"
 
+    minui-power-control drastic &
     "$EMU_DIR/drastic" "$*"
 }
 
