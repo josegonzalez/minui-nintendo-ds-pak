@@ -6,7 +6,7 @@ rm -f "$LOGS_PATH/NDS.txt"
 exec >>"$LOGS_PATH/NDS.txt"
 exec 2>&1
 
-echo $0 $*
+echo "$0" "$@"
 
 mkdir -p "$USERDATA_PATH/NDS-advanced-drastic"
 EMU_DIR="$SDCARD_PATH/Emus/$PLATFORM/NDS.pak/drastic"
