@@ -7,11 +7,17 @@ PUSH_PLATFORM ?= tg5040
 
 PLATFORMS := tg5040
 
-clean:
-	true
+MINUI_POWER_CONTROL_VERSION := 1.1.0
 
-build:
-	true
+clean:
+	rm -f bin/minui-power-control
+
+build: bin/minui-power-control
+
+bin/minui-power-control:
+	mkdir -p bin
+	curl -f -o bin/minui-power-control -sSL https://github.com/ben16w/minui-power-control/releases/download/$(MINUI_POWER_CONTROL_VERSION)/minui-power-control
+	chmod +x bin/minui-power-control
 
 release: build
 	mkdir -p dist
