@@ -1,9 +1,0 @@
-{
-    "label": "NDS",
-    "launch": "launch.sh",
-    "description": "Runs drastic in standalone mode for the specified rom",
-    "pak_type": "emu",
-    "platforms": [
-        "tg5040"
-    ]
-}
