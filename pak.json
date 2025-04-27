@@ -3,7 +3,7 @@
   "type": "EMU",
   "description": "Runs drastic in standalone mode for the specified rom",
   "author": "josegonzalez",
-  "repo_url": "https://github.com/josegonzalez/minui-nds-pak",
+  "repo_url": "https://github.com/josegonzalez/minui-nintendo-ds-pak",
   "release_filename": "NDS.pak.zip",
   "platforms": [
     "tg5040"
