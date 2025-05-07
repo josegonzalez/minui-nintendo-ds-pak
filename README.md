@@ -6,7 +6,7 @@ A MinUI Emu Pak for Nintendo DS, wrapping the standalone Advanced Drastic Ninten
 
 This pak is designed and tested on the following MinUI Platforms and devices:
 
-- `tg5040`: Trimui Brick (formerly `tg3040`)
+- `tg5040`: Trimui Brick (formerly `tg3040`) and Trimui Smart Pro
 
 Use the correct platform for your device.
 
