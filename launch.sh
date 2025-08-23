@@ -32,6 +32,7 @@ cleanup() {
     fi
 
     umount "$EMU_DIR/backup" || true
+    umount "$EMU_DIR/cheats" || true
     umount "$EMU_DIR/savestates" || true
 }
 
@@ -46,17 +47,26 @@ main() {
     echo 1608000 >/sys/devices/system/cpu/cpu0/cpufreq/scaling_min_freq
     echo 1800000 >/sys/devices/system/cpu/cpu0/cpufreq/scaling_max_freq
 
-    cd "$EMU_DIR"
-    export HOME="$EMU_DIR"
-
     mkdir -p "$SDCARD_PATH/Saves/NDS"
+    mkdir -p "$SDCARD_PATH/Cheats/NDS"
     mkdir -p "$EMU_DIR/backup"
+
+    if [ -d "$EMU_DIR/cheats" ]; then
+        if ls -A "$EMU_DIR/cheats" | grep -q .; then
+            cd "$EMU_DIR/cheats"
+            mv * "$SDCARD_PATH/Cheats/NDS/"
+        fi
+    fi
+
     mount -o bind "$SDCARD_PATH/Saves/NDS" "$EMU_DIR/backup"
+    mount -o bind "$SDCARD_PATH/Cheats/NDS" "$EMU_DIR/cheats"
 
     mkdir -p "$SHARED_USERDATA_PATH/NDS-advanced-drastic"
     mkdir -p "$EMU_DIR/savestates"
     mount -o bind "$SHARED_USERDATA_PATH/NDS-advanced-drastic" "$EMU_DIR/savestates"
 
+    cd "$EMU_DIR"
+    export HOME="$EMU_DIR"
     minui-power-control drastic &
     "$EMU_DIR/drastic" "$*"
 }
