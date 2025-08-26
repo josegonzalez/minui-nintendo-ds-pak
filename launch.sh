@@ -54,7 +54,7 @@ main() {
     if [ -d "$EMU_DIR/cheats" ]; then
         if ls -A "$EMU_DIR/cheats" | grep -q .; then
             cd "$EMU_DIR/cheats"
-            mv * "$SDCARD_PATH/Cheats/NDS/"
+            mv * "$SDCARD_PATH/Cheats/NDS/" || true
         fi
     fi
 
