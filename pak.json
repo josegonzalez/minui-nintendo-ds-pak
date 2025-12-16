@@ -8,6 +8,10 @@
   "platforms": [
     "tg5040"
   ],
+  "update_ignore": [
+    "drastic/config/drastic.cfg",
+    "drastic/resources/settings.json"
+  ],
   "launch": "launch.sh",
   "version": "0.6.2"
 }
