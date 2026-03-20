@@ -19,15 +19,15 @@ cleanup() {
     rm -f /tmp/stay_awake
 
     if [ -f "$USERDATA_PATH/NDS-advanced-drastic/cpu_governor.txt" ]; then
-        cat "$USERDATA_PATH/NDS-advanced-drastic/cpu_governor.txt" >/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor
+        cat "$USERDATA_PATH/NDS-advanced-drastic/cpu_governor.txt" >/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor || true
         rm -f "$USERDATA_PATH/NDS-advanced-drastic/cpu_governor.txt"
     fi
     if [ -f "$USERDATA_PATH/NDS-advanced-drastic/cpu_min_freq.txt" ]; then
-        cat "$USERDATA_PATH/NDS-advanced-drastic/cpu_min_freq.txt" >/sys/devices/system/cpu/cpu0/cpufreq/scaling_min_freq
+        cat "$USERDATA_PATH/NDS-advanced-drastic/cpu_min_freq.txt" >/sys/devices/system/cpu/cpu0/cpufreq/scaling_min_freq || true
         rm -f "$USERDATA_PATH/NDS-advanced-drastic/cpu_min_freq.txt"
     fi
     if [ -f "$USERDATA_PATH/NDS-advanced-drastic/cpu_max_freq.txt" ]; then
-        cat "$USERDATA_PATH/NDS-advanced-drastic/cpu_max_freq.txt" >/sys/devices/system/cpu/cpu0/cpufreq/scaling_max_freq
+        cat "$USERDATA_PATH/NDS-advanced-drastic/cpu_max_freq.txt" >/sys/devices/system/cpu/cpu0/cpufreq/scaling_max_freq || true
         rm -f "$USERDATA_PATH/NDS-advanced-drastic/cpu_max_freq.txt"
     fi
 
@@ -43,9 +43,9 @@ main() {
     cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor >"$USERDATA_PATH/NDS-advanced-drastic/cpu_governor.txt"
     cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_min_freq >"$USERDATA_PATH/NDS-advanced-drastic/cpu_min_freq.txt"
     cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_max_freq >"$USERDATA_PATH/NDS-advanced-drastic/cpu_max_freq.txt"
-    echo ondemand >/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor
-    echo 1608000 >/sys/devices/system/cpu/cpu0/cpufreq/scaling_min_freq
-    echo 1800000 >/sys/devices/system/cpu/cpu0/cpufreq/scaling_max_freq
+    echo ondemand >/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor || true
+    echo 1608000 >/sys/devices/system/cpu/cpu0/cpufreq/scaling_min_freq || true
+    echo 1800000 >/sys/devices/system/cpu/cpu0/cpufreq/scaling_max_freq || true
 
     mkdir -p "$SDCARD_PATH/Saves/NDS"
     mkdir -p "$SDCARD_PATH/Cheats/NDS"
