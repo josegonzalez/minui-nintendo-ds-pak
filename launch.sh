@@ -6,19 +6,27 @@ exec >>"$LOGS_PATH/NDS.txt" 2>&1
 echo "$0" "$@"
 
 # MARK: Variables
+# SDL_AUDIODRIVER=pulseaudio
+
 EMU_DIR="$SDCARD_PATH/Emus/$PLATFORM/NDS.pak/drastic"
 PACK_DIR="$SDCARD_PATH/Emus/$PLATFORM/NDS.pak"
 
 SYSTEM_CPU_DIR="/sys/devices/system/cpu/cpufreq"
-# NOTE: Most low-end handled devices using share frequency on all core(policy0 affect all available cores). Setting everything here is more than enough
+# NOTE:(2026-03-29 11:08:18 +07)Most low-end handled devices using share frequency on all core(policy0 affect all available cores). Setting everything here is more than enough
 SYSTEM_CPU_POLICY0="$SYSTEM_CPU_DIR/policy0"
-# NOTE: Instead of hardcoding the min/max frequency, we can read it from the system then using awk to pick our desired frequency
+# NOTE:(2026-03-29 11:08:09 +07)Instead of hardcoding the min/max frequency, we can read it from the system then using awk to pick our desired frequency
 AVAILABLE_CPU_FREQS=$(cat "$SYSTEM_CPU_POLICY0/scaling_available_frequencies")
 MIN_CPU_FREQ=$(echo "$AVAILABLE_CPU_FREQS" | awk '{print $1}')
 MAX_CPU_FREQ=$(echo "$AVAILABLE_CPU_FREQS" | awk '{print $NF}')
-SECOND_MAX_CPU_FREQ=$(echo "$AVAILABLE_CPU_FREQS" | awk '{print $(NF-1)}')
-THIRD_MAX_CPU_FREQ=$(echo "$AVAILABLE_CPU_FREQS" | awk '{print $(NF-2)}')
-MIDDLE_MAX_CPU_FREQ=$(echo "$AVAILABLE_CPU_FREQS" | awk '{print $(int(NF/2)+1)}')
+
+# NOTE:(2026-03-29 10:43:28 +07) After intense testing for best cpu freq, 1608000 come with perfect balance for efficient and performance. For any device with cpu freq below 1608000, we will use the max freq instead
+PREFER_CPU_FREQ=$(echo "$AVAILABLE_CPU_FREQS" | awk '{for(i=1;i<=NF;i++) if($i<=1608000) val=$i} END{print val}')
+
+NDS_MINUI_SAVE="$SDCARD_PATH/Saves/NDS"
+NDS_MINUI_CHEAT="$SDCARD_PATH/Cheats/NDS"
+NDS_USERDATA_NAME="NDS-advanced-drastic"
+NDS_USERDATA_DIR="$USERDATA_PATH/$NDS_USERDATA_NAME"
+NDS_SHARE_USERDATA_DIR="$SHARED_USERDATA_PATH/$NDS_USERDATA_NAME"
 
 TEMP_PREFIX=system_
 CPU_SCALING_GOVERNOR=scaling_governor
@@ -28,19 +36,13 @@ TEMP_SCALING_FILE="$NDS_USERDATA_DIR/$TEMP_PREFIX$CPU_SCALING_GOVERNOR.txt"
 TEMP_SCALING_MIN_FREQ="$NDS_USERDATA_DIR/$TEMP_PREFIX$CPU_SCALING_MIN_FREQ.txt"
 TEMP_SCALING_MAX_FREQ="$NDS_USERDATA_DIR/$TEMP_PREFIX$CPU_SCALING_MAX_FREQ.txt"
 
-NDS_MINUI_SAVE="$SDCARD_PATH/Saves/NDS"
-NDS_MINUI_CHEAT="$SDCARD_PATH/Cheats/NDS"
-NDS_USERDATA_NAME="NDS-advanced-drastic"
-NDS_USERDATA_DIR="$USERDATA_PATH/$NDS_USERDATA_NAME"
-NDS_SHARE_USERDATA_DIR="$SHARED_USERDATA_PATH/$NDS_USERDATA_NAME"
-
 # MARK: Exports
 export PATH="$EMU_DIR:$PACK_DIR/bin:$PATH"
 export LD_LIBRARY_PATH="$EMU_DIR/libs:$PACK_DIR/lib:$LD_LIBRARY_PATH"
 export HOME="$EMU_DIR"
 
 # MARK: Functions
-cleanup() {
+nds_cleanup() {
 	# Restore to default behavior
 	rm -f /tmp/stay_awake
 
@@ -59,43 +61,37 @@ cleanup() {
 
 	umount "$EMU_DIR/backup" || true
 	umount "$EMU_DIR/cheats" || true
-	umount "$EMU_DIR/sav"]
+	umount "$EMU_DIR/savestates" || true
 }
 
+# NOTE: (2026-03-29 10:49:44 +07)For future researcher, if you have better idea for cpu governor, feel free to add it here. trngaje-advance-drastic current implementation with heavier game or normal game will never use that much cpu load(mostly highest will be ~50%) except when fast forward is toggle. Beside that, especially when using anything but performance governor, when you access menu and wait for a while(cool down cpu load, the current freq now will be the MIN_CPU_FREQ) and resume back, the game cpu freq will be stuck at that $MIN_CPU_FREQ until you reset the game -> stick to one freq and the highest one, which mean performance governor is the best match.
 nds_cpu_configure() {
 	echo "Custom setting for $1 governor"
 	case $1 in
-		conservative)
-			echo "$MIDDLE_MAX_CPU_FREQ" >"$SYSTEM_CPU_POLICY0/scaling_min_freq" || true
-			echo "$MAX_CPU_FREQ" >"$SYSTEM_CPU_POLICY0/scaling_max_freq" || true
-			echo 2 >"$SYSTEM_CPU_DIR/$1/sampling_down_factor" || true
-			echo 75 >"$SYSTEM_CPU_DIR/$1/up_threshold" || true
-			echo 10 >"$SYSTEM_CPU_DIR/$1/down_threshold" || true
-			echo 10 >"$SYSTEM_CPU_DIR/$1/freq_step" || true
-			echo 1 >"$SYSTEM_CPU_DIR/$1/ignore_nice_load" || true
-			;;
 		performance)
+			echo "$1" >"$SYSTEM_CPU_POLICY0/$CPU_SCALING_GOVERNOR" || true
 			echo "$MIN_CPU_FREQ" >"$SYSTEM_CPU_POLICY0/scaling_min_freq" || true
-			echo "$SECOND_MAX_CPU_FREQ" >"$SYSTEM_CPU_POLICY0/scaling_max_freq" || true
+			echo "$PREFER_CPU_FREQ" >"$SYSTEM_CPU_POLICY0/scaling_max_freq" || true
 			;;
-		schedutil)
-			echo "$MIDDLE_MAX_CPU_FREQ" >"$SYSTEM_CPU_POLICY0/scaling_min_freq" || true
-			echo "$SECOND_MAX_CPU_FREQ" >"$SYSTEM_CPU_POLICY0/scaling_max_freq" || true
+		*)
+			echo "Unsupported governor: $1"
 			;;
-
 	esac
 }
 
 nds_launch() {
-	# Hacks: Some retro devices will sleep after a while without this
+	# Hack: Some retro devices will sleep after a while without this
 	echo 1 >/tmp/stay_awake
-	trap "cleanup" EXIT INT TERM HUP QUIT
+
+	# Cleanup on exit
+	trap "nds_cleanup" EXIT INT TERM HUP QUIT
 
 	cat "$SYSTEM_CPU_POLICY0/$CPU_SCALING_GOVERNOR" >"$TEMP_SCALING_FILE"
 	cat "$SYSTEM_CPU_POLICY0/$CPU_SCALING_MIN_FREQ" >"$TEMP_SCALING_MIN_FREQ"
 	cat "$SYSTEM_CPU_POLICY0/$CPU_SCALING_MAX_FREQ" >"$TEMP_SCALING_MAX_FREQ"
 
-	nds_cpu_configure conservative
+	# Predefined cpu profile for drastic
+	nds_cpu_configure performance
 
 	# Create all required directories if they don't exist
 	mkdir -p "$SDCARD_PATH/Saves/NDS"
