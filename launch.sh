@@ -45,40 +45,40 @@ export HOME="$EMU_DIR"
 
 # MARK: Functions
 nds_cleanup() {
-	# Restore to default behavior
-	rm -f /tmp/stay_awake
+    # Restore to default behavior
+    rm -f /tmp/stay_awake
 
-	if [ -f "$TEMP_SCALING_FILE" ]; then
-		cat "$TEMP_SCALING_FILE" >"$SYSTEM_CPU_POLICY0/$CPU_SCALING_GOVERNOR" || true
-		rm -f "$TEMP_SCALING_FILE"
-	fi
-	if [ -f "$TEMP_SCALING_MIN_FREQ" ]; then
-		cat "$TEMP_SCALING_MIN_FREQ" >"$SYSTEM_CPU_POLICY0/$CPU_SCALING_MIN_FREQ" || true
-		rm -f "$TEMP_SCALING_MIN_FREQ"
-	fi
-	if [ -f "$TEMP_SCALING_MAX_FREQ" ]; then
-		cat "$TEMP_SCALING_MAX_FREQ" >"$SYSTEM_CPU_POLICY0/$CPU_SCALING_MAX_FREQ" || true
-		rm -f "$TEMP_SCALING_MAX_FREQ"
-	fi
+    if [ -f "$TEMP_SCALING_FILE" ]; then
+        cat "$TEMP_SCALING_FILE" >"$SYSTEM_CPU_POLICY0/$CPU_SCALING_GOVERNOR" || true
+        rm -f "$TEMP_SCALING_FILE"
+    fi
+    if [ -f "$TEMP_SCALING_MIN_FREQ" ]; then
+        cat "$TEMP_SCALING_MIN_FREQ" >"$SYSTEM_CPU_POLICY0/$CPU_SCALING_MIN_FREQ" || true
+        rm -f "$TEMP_SCALING_MIN_FREQ"
+    fi
+    if [ -f "$TEMP_SCALING_MAX_FREQ" ]; then
+        cat "$TEMP_SCALING_MAX_FREQ" >"$SYSTEM_CPU_POLICY0/$CPU_SCALING_MAX_FREQ" || true
+        rm -f "$TEMP_SCALING_MAX_FREQ"
+    fi
 
-	umount "$EMU_DIR/backup" || true
-	umount "$EMU_DIR/cheats" || true
-	umount "$EMU_DIR/savestates" || true
+    umount "$EMU_DIR/backup" || true
+    umount "$EMU_DIR/cheats" || true
+    umount "$EMU_DIR/savestates" || true
 }
 
 # NOTE: (2026-03-29 10:49:44 +07)For future researcher, if you have better idea for cpu governor, feel free to add it here. trngaje-advance-drastic current implementation with heavier game or normal game will never use that much cpu load(mostly highest will be ~50%) except when fast forward is toggle. Beside that, especially when using anything but performance governor, when you access menu and wait for a while(cool down cpu load, the current freq now will be the MIN_CPU_FREQ) and resume back, the game cpu freq will be stuck at that $MIN_CPU_FREQ until you reset the game -> stick to one freq and the highest one, which mean performance governor is the best match.
 nds_cpu_configure() {
-	echo "Custom setting for $1 governor"
-	case $1 in
-		performance)
-			echo "$1" >"$SYSTEM_CPU_POLICY0/$CPU_SCALING_GOVERNOR" || true
-			echo "$MIN_CPU_FREQ" >"$SYSTEM_CPU_POLICY0/scaling_min_freq" || true
-			echo "$PREFER_CPU_FREQ" >"$SYSTEM_CPU_POLICY0/scaling_max_freq" || true
-			;;
-		*)
-			echo "Unsupported governor: $1"
-			;;
-	esac
+    echo "Custom setting for $1 governor"
+    case $1 in
+        performance)
+            echo "$1" >"$SYSTEM_CPU_POLICY0/$CPU_SCALING_GOVERNOR" || true
+            echo "$MIN_CPU_FREQ" >"$SYSTEM_CPU_POLICY0/scaling_min_freq" || true
+            echo "$PREFER_CPU_FREQ" >"$SYSTEM_CPU_POLICY0/scaling_max_freq" || true
+            ;;
+        *)
+            echo "Unsupported governor: $1"
+            ;;
+    esac
 }
 
 # Hack: Force the emulator to run in more stable speed, the UI doesn't provide the option and setting this in the config file will cause the UI to display as none, but the emulator will run in 100%. This has been careful calculate and test to match the best speed it could. Below is the map for the frame_interval value with "Performance->Speed override" setting
@@ -90,51 +90,51 @@ nds_cpu_configure() {
 # 20000 - 250%
 # 16666 - 300%
 nds_frame_interval_patch() {
-	find "$EMU_DIR/config" -name "*.cfg" | while read -r CONFIG_PATH; do
-		# If the frame_interval is not 50050 or 100000, set it to 50050
-		NDS_CONFIG_SHOULD_PATCH=$(awk -F' = ' '/^frame_interval/ {print !($2>=50050 || $2==100000)}' "$CONFIG_PATH")
-		if [ "$NDS_CONFIG_SHOULD_PATCH" -eq 1 ]; then
-			sed -i 's/frame_interval *= .*/frame_interval = 50050/' "$CONFIG_PATH"
-		fi
-	done
+    find "$EMU_DIR/config" -name "*.cfg" | while read -r CONFIG_PATH; do
+        # If the frame_interval is not 50050 or 100000, set it to 50050
+        NDS_CONFIG_SHOULD_PATCH=$(awk -F' = ' '/^frame_interval/ {print !($2>=50050 || $2==100000)}' "$CONFIG_PATH")
+        if [ "$NDS_CONFIG_SHOULD_PATCH" -eq 1 ]; then
+            sed -i 's/frame_interval *= .*/frame_interval = 50050/' "$CONFIG_PATH"
+        fi
+    done
 }
 
 nds_launch() {
-	# Hack: Some retro devices will sleep after a while without this
-	echo "1" >/tmp/stay_awake
+    # Hack: Some retro devices will sleep after a while without this
+    echo "1" >/tmp/stay_awake
 
-	# Cleanup on exit
-	trap "nds_cleanup" EXIT INT TERM HUP QUIT
+    # Cleanup on exit
+    trap "nds_cleanup" EXIT INT TERM HUP QUIT
 
-	cat "$SYSTEM_CPU_POLICY0/$CPU_SCALING_GOVERNOR" >"$TEMP_SCALING_FILE"
-	cat "$SYSTEM_CPU_POLICY0/$CPU_SCALING_MIN_FREQ" >"$TEMP_SCALING_MIN_FREQ"
-	cat "$SYSTEM_CPU_POLICY0/$CPU_SCALING_MAX_FREQ" >"$TEMP_SCALING_MAX_FREQ"
+    cat "$SYSTEM_CPU_POLICY0/$CPU_SCALING_GOVERNOR" >"$TEMP_SCALING_FILE"
+    cat "$SYSTEM_CPU_POLICY0/$CPU_SCALING_MIN_FREQ" >"$TEMP_SCALING_MIN_FREQ"
+    cat "$SYSTEM_CPU_POLICY0/$CPU_SCALING_MAX_FREQ" >"$TEMP_SCALING_MAX_FREQ"
 
-	# Predefined cpu profile for drastic
-	nds_cpu_configure performance
-	nds_frame_interval_patch
+    # Predefined cpu profile for drastic
+    nds_cpu_configure performance
+    nds_frame_interval_patch
 
-	# Create all required directories if they don't exist
-	mkdir -p "$SDCARD_PATH/Saves/NDS"
-	mkdir -p "$SDCARD_PATH/Cheats/NDS"
-	mkdir -p "$EMU_DIR/backup"
-	mkdir -p "$EMU_DIR/savestates"
-	mkdir -p "$SHARED_USERDATA_PATH/NDS-advanced-drastic"
+    # Create all required directories if they don't exist
+    mkdir -p "$SDCARD_PATH/Saves/NDS"
+    mkdir -p "$SDCARD_PATH/Cheats/NDS"
+    mkdir -p "$EMU_DIR/backup"
+    mkdir -p "$EMU_DIR/savestates"
+    mkdir -p "$SHARED_USERDATA_PATH/NDS-advanced-drastic"
 
-	if [ -d "$EMU_DIR/cheats" ]; then
-		if ls -A "$EMU_DIR/cheats" | grep -q .; then
-			mv "$EMU_DIR/cheats/*" "$SDCARD_PATH/Cheats/NDS/" || true
-		fi
-	fi
+    if [ -d "$EMU_DIR/cheats" ]; then
+        if ls -A "$EMU_DIR/cheats" | grep -q .; then
+            mv "$EMU_DIR/cheats/*" "$SDCARD_PATH/Cheats/NDS/" || true
+        fi
+    fi
 
-	mount -o bind "$SDCARD_PATH/Saves/NDS" "$EMU_DIR/backup"
-	mount -o bind "$SDCARD_PATH/Cheats/NDS" "$EMU_DIR/cheats"
-	mount -o bind "$SHARED_USERDATA_PATH/NDS-advanced-drastic" "$EMU_DIR/savestates"
+    mount -o bind "$SDCARD_PATH/Saves/NDS" "$EMU_DIR/backup"
+    mount -o bind "$SDCARD_PATH/Cheats/NDS" "$EMU_DIR/cheats"
+    mount -o bind "$SHARED_USERDATA_PATH/NDS-advanced-drastic" "$EMU_DIR/savestates"
 
-	# Trigger custom minui-power-control and launch the emulator, make sure to be in the current directory
-	cd "$EMU_DIR"
-	minui-power-control drastic &
-	"$EMU_DIR/drastic" "$*"
+    # Trigger custom minui-power-control and launch the emulator, make sure to be in the current directory
+    cd "$EMU_DIR"
+    minui-power-control drastic &
+    "$EMU_DIR/drastic" "$*"
 }
 
 # MARK: Main
