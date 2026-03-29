@@ -79,6 +79,21 @@ nds_cpu_configure() {
 	esac
 }
 
+# Hack: Force the emulator to run in more stable speed, the UI doesn't provide the option and setting is in the config file will cause the ui to display as none, but the emulator still use this. This has been careful calculate and test to match the best speed it could.
+# 100000 - 50%
+# 50050 - ~101% -> Just enough so the sound will be as less off sync as possible
+# 33333 - 150%
+# 25000 - 200%
+# 20000 - 250%
+# 16666 - 300%
+nds_frame_interval_hack() {
+	for f in "$EMU_DIR/config/*.cfg"; do
+		if awk -F'=' '/^frame_interval/ {exit !($2>=50050 || $2==100000)}' "$f"; then
+			sed -i 's/frame_interval *= .*/frame_interval = 0/' "$f"
+		fi
+	done
+}
+
 nds_launch() {
 	# Hack: Some retro devices will sleep after a while without this
 	echo 1 >/tmp/stay_awake
@@ -92,6 +107,7 @@ nds_launch() {
 
 	# Predefined cpu profile for drastic
 	nds_cpu_configure performance
+	nds_frame_interval_hack
 
 	# Create all required directories if they don't exist
 	mkdir -p "$SDCARD_PATH/Saves/NDS"
