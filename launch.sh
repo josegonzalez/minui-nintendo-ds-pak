@@ -1,15 +1,9 @@
 #!/bin/sh
-# MARK: Setup
 set -euxo pipefail
+rm -f "$LOGS_PATH/NDS.txt"
 exec >>"$LOGS_PATH/NDS.txt" 2>&1
 
-rm -f "$LOGS_PATH/NDS.txt"
-
 echo "$0" "$@"
-
-# MARK: Variables
-# SDL_AUDIODRIVER=pulseaudio
-# SDL_VIDEODRIVER=mali
 
 EMU_DIR="$SDCARD_PATH/Emus/$PLATFORM/NDS.pak/drastic"
 PACK_DIR="$SDCARD_PATH/Emus/$PLATFORM/NDS.pak"
@@ -39,33 +33,9 @@ TEMP_SCALING_FILE="$NDS_USERDATA_DIR/$TEMP_PREFIX$CPU_SCALING_GOVERNOR.txt"
 TEMP_SCALING_MIN_FREQ="$NDS_USERDATA_DIR/$TEMP_PREFIX$CPU_SCALING_MIN_FREQ.txt"
 TEMP_SCALING_MAX_FREQ="$NDS_USERDATA_DIR/$TEMP_PREFIX$CPU_SCALING_MAX_FREQ.txt"
 
-# MARK: Exports
 export PATH="$EMU_DIR:$PACK_DIR/bin:$PATH"
 export LD_LIBRARY_PATH="$EMU_DIR/libs:$PACK_DIR/lib:$LD_LIBRARY_PATH"
 export HOME="$EMU_DIR"
-
-# MARK: Functions
-nds_cleanup() {
-    # Restore to default behavior
-    rm -f /tmp/stay_awake
-
-    if [ -f "$TEMP_SCALING_FILE" ]; then
-        cat "$TEMP_SCALING_FILE" >"$SYSTEM_CPU_POLICY0/$CPU_SCALING_GOVERNOR" || true
-        rm -f "$TEMP_SCALING_FILE"
-    fi
-    if [ -f "$TEMP_SCALING_MIN_FREQ" ]; then
-        cat "$TEMP_SCALING_MIN_FREQ" >"$SYSTEM_CPU_POLICY0/$CPU_SCALING_MIN_FREQ" || true
-        rm -f "$TEMP_SCALING_MIN_FREQ"
-    fi
-    if [ -f "$TEMP_SCALING_MAX_FREQ" ]; then
-        cat "$TEMP_SCALING_MAX_FREQ" >"$SYSTEM_CPU_POLICY0/$CPU_SCALING_MAX_FREQ" || true
-        rm -f "$TEMP_SCALING_MAX_FREQ"
-    fi
-
-    umount "$EMU_DIR/backup" || true
-    umount "$EMU_DIR/cheats" || true
-    umount "$EMU_DIR/savestates" || true
-}
 
 # NOTE: (2026-03-29 10:49:44 +07)For future researcher, if you have better idea for cpu governor, feel free to add it here. trngaje-advance-drastic current implementation with heavier game or normal game will never use that much cpu load(mostly highest will be ~50%) except when fast forward is toggle. Beside that, especially when using anything but performance governor, when you access menu and wait for a while(cool down cpu load, the current freq now will be the MIN_CPU_FREQ) and resume back, the game cpu freq will be stuck at that $MIN_CPU_FREQ until you reset the game -> stick to one freq and the highest one, which mean performance governor is the best match.
 nds_cpu_configure() {
@@ -100,12 +70,30 @@ nds_frame_interval_patch() {
     done
 }
 
-nds_launch() {
-    # Hack: Some retro devices will sleep after a while without this
-    echo "1" >/tmp/stay_awake
+cleanup() {
+    rm -f /tmp/stay_awake
 
-    # Cleanup on exit
-    trap "nds_cleanup" EXIT INT TERM HUP QUIT
+    if [ -f "$TEMP_SCALING_FILE" ]; then
+        cat "$TEMP_SCALING_FILE" >"$SYSTEM_CPU_POLICY0/$CPU_SCALING_GOVERNOR" || true
+        rm -f "$TEMP_SCALING_FILE"
+    fi
+    if [ -f "$TEMP_SCALING_MIN_FREQ" ]; then
+        cat "$TEMP_SCALING_MIN_FREQ" >"$SYSTEM_CPU_POLICY0/$CPU_SCALING_MIN_FREQ" || true
+        rm -f "$TEMP_SCALING_MIN_FREQ"
+    fi
+    if [ -f "$TEMP_SCALING_MAX_FREQ" ]; then
+        cat "$TEMP_SCALING_MAX_FREQ" >"$SYSTEM_CPU_POLICY0/$CPU_SCALING_MAX_FREQ" || true
+        rm -f "$TEMP_SCALING_MAX_FREQ"
+    fi
+
+    umount "$EMU_DIR/backup" || true
+    umount "$EMU_DIR/cheats" || true
+    umount "$EMU_DIR/savestates" || true
+}
+
+main() {
+    echo "1" >/tmp/stay_awake
+    trap "cleanup" EXIT INT TERM HUP QUIT
 
     cat "$SYSTEM_CPU_POLICY0/$CPU_SCALING_GOVERNOR" >"$TEMP_SCALING_FILE"
     cat "$SYSTEM_CPU_POLICY0/$CPU_SCALING_MIN_FREQ" >"$TEMP_SCALING_MIN_FREQ"
@@ -138,5 +126,4 @@ nds_launch() {
     "$EMU_DIR/drastic" "$*"
 }
 
-# MARK: Main
-nds_launch "$@"
+main "$@"
