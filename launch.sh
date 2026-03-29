@@ -9,6 +9,7 @@ echo "$0" "$@"
 
 # MARK: Variables
 # SDL_AUDIODRIVER=pulseaudio
+# SDL_VIDEODRIVER=mali
 
 EMU_DIR="$SDCARD_PATH/Emus/$PLATFORM/NDS.pak/drastic"
 PACK_DIR="$SDCARD_PATH/Emus/$PLATFORM/NDS.pak"
@@ -84,15 +85,15 @@ nds_cpu_configure() {
 # Hack: Force the emulator to run in more stable speed, the UI doesn't provide the option and setting this in the config file will cause the UI to display as none, but the emulator will run in 100%. This has been careful calculate and test to match the best speed it could. Below is the map for the frame_interval value with "Performance->Speed override" setting
 # 0 - none
 # 100000 - 50%
-# 50050 - ~101% (not include, display as none) -> Just enough so the sound will be as less off sync as possible
+# 47619 - ~105% -> Just enough so the sound will be as less off sync as possible
 # 33333 - 150%
 # 25000 - 200%
 # 20000 - 250%
 # 16666 - 300%
 nds_frame_interval_patch() {
     find "$EMU_DIR/config" -name "*.cfg" | while read -r CONFIG_PATH; do
-        # If the frame_interval is not 50050 or 100000, set it to 50050
-        NDS_CONFIG_SHOULD_PATCH=$(awk -F' = ' '/^frame_interval/ {print !($2>=50050 || $2==100000)}' "$CONFIG_PATH")
+        # If the frame_interval is not 47619 or 100000, set it to 47619
+        NDS_CONFIG_SHOULD_PATCH=$(awk -F' = ' '/^frame_interval/ {print !($2>=47619 || $2==100000)}' "$CONFIG_PATH")
         if [ "$NDS_CONFIG_SHOULD_PATCH" -eq 1 ]; then
             sed -i 's/frame_interval *= .*/frame_interval = 50050/' "$CONFIG_PATH"
         fi
