@@ -95,7 +95,7 @@ nds_frame_interval_patch() {
         # If the frame_interval is not 47619 or 100000, set it to 47619
         NDS_CONFIG_SHOULD_PATCH=$(awk -F' = ' '/^frame_interval/ {print !($2>=47619 || $2==100000)}' "$CONFIG_PATH")
         if [ "$NDS_CONFIG_SHOULD_PATCH" -eq 1 ]; then
-            sed -i 's/frame_interval *= .*/frame_interval = 50050/' "$CONFIG_PATH"
+            sed -i 's/frame_interval *= .*/frame_interval = 47619/' "$CONFIG_PATH"
         fi
     done
 }
