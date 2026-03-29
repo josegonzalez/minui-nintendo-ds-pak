@@ -3,6 +3,8 @@
 set -euxo pipefail
 exec >>"$LOGS_PATH/NDS.txt" 2>&1
 
+rm -f "$LOGS_PATH/NDS.txt"
+
 echo "$0" "$@"
 
 # MARK: Variables
@@ -79,24 +81,27 @@ nds_cpu_configure() {
 	esac
 }
 
-# Hack: Force the emulator to run in more stable speed, the UI doesn't provide the option and setting is in the config file will cause the ui to display as none, but the emulator still use this. This has been careful calculate and test to match the best speed it could.
+# Hack: Force the emulator to run in more stable speed, the UI doesn't provide the option and setting this in the config file will cause the UI to display as none, but the emulator will run in 100%. This has been careful calculate and test to match the best speed it could. Below is the map for the frame_interval value with "Performance->Speed override" setting
+# 0 - none
 # 100000 - 50%
-# 50050 - ~101% -> Just enough so the sound will be as less off sync as possible
+# 50050 - ~101% (not include, display as none) -> Just enough so the sound will be as less off sync as possible
 # 33333 - 150%
 # 25000 - 200%
 # 20000 - 250%
 # 16666 - 300%
-nds_frame_interval_hack() {
-	for f in "$EMU_DIR/config/*.cfg"; do
-		if awk -F'=' '/^frame_interval/ {exit !($2>=50050 || $2==100000)}' "$f"; then
-			sed -i 's/frame_interval *= .*/frame_interval = 0/' "$f"
+nds_frame_interval_patch() {
+	find "$EMU_DIR/config" -name "*.cfg" | while read -r CONFIG_PATH; do
+		# If the frame_interval is not 50050 or 100000, set it to 50050
+		NDS_CONFIG_SHOULD_PATCH=$(awk -F' = ' '/^frame_interval/ {print !($2>=50050 || $2==100000)}' "$CONFIG_PATH")
+		if [ "$NDS_CONFIG_SHOULD_PATCH" -eq 1 ]; then
+			sed -i 's/frame_interval *= .*/frame_interval = 50050/' "$CONFIG_PATH"
 		fi
 	done
 }
 
 nds_launch() {
 	# Hack: Some retro devices will sleep after a while without this
-	echo 1 >/tmp/stay_awake
+	echo "1" >/tmp/stay_awake
 
 	# Cleanup on exit
 	trap "nds_cleanup" EXIT INT TERM HUP QUIT
@@ -107,14 +112,14 @@ nds_launch() {
 
 	# Predefined cpu profile for drastic
 	nds_cpu_configure performance
-	nds_frame_interval_hack
+	nds_frame_interval_patch
 
 	# Create all required directories if they don't exist
 	mkdir -p "$SDCARD_PATH/Saves/NDS"
 	mkdir -p "$SDCARD_PATH/Cheats/NDS"
 	mkdir -p "$EMU_DIR/backup"
-    mkdir -p "$EMU_DIR/savestates"
-    mkdir -p "$SHARED_USERDATA_PATH/NDS-advanced-drastic"
+	mkdir -p "$EMU_DIR/savestates"
+	mkdir -p "$SHARED_USERDATA_PATH/NDS-advanced-drastic"
 
 	if [ -d "$EMU_DIR/cheats" ]; then
 		if ls -A "$EMU_DIR/cheats" | grep -q .; then
