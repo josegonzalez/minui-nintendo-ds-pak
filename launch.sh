@@ -95,6 +95,14 @@ main() {
     echo "1" >/tmp/stay_awake
     trap "cleanup" EXIT INT TERM HUP QUIT
 
+    # Create all required directories if they don't exist
+    mkdir -p "$NDS_MINUI_SAVE"
+    mkdir -p "$NDS_MINUI_CHEAT"
+    mkdir -p "$NDS_USERDATA_DIR"
+    mkdir -p "$NDS_SHARE_USERDATA_DIR"
+    mkdir -p "$EMU_DIR/backup"
+    mkdir -p "$EMU_DIR/savestates"
+
     cat "$SYSTEM_CPU_POLICY0/$CPU_SCALING_GOVERNOR" >"$TEMP_SCALING_FILE"
     cat "$SYSTEM_CPU_POLICY0/$CPU_SCALING_MIN_FREQ" >"$TEMP_SCALING_MIN_FREQ"
     cat "$SYSTEM_CPU_POLICY0/$CPU_SCALING_MAX_FREQ" >"$TEMP_SCALING_MAX_FREQ"
@@ -103,22 +111,15 @@ main() {
     nds_cpu_configure performance
     nds_frame_interval_patch
 
-    # Create all required directories if they don't exist
-    mkdir -p "$SDCARD_PATH/Saves/NDS"
-    mkdir -p "$SDCARD_PATH/Cheats/NDS"
-    mkdir -p "$EMU_DIR/backup"
-    mkdir -p "$EMU_DIR/savestates"
-    mkdir -p "$SHARED_USERDATA_PATH/NDS-advanced-drastic"
-
     if [ -d "$EMU_DIR/cheats" ]; then
         if ls -A "$EMU_DIR/cheats" | grep -q .; then
-            mv "$EMU_DIR/cheats/*" "$SDCARD_PATH/Cheats/NDS/" || true
+            mv "$EMU_DIR/cheats/*" "$NDS_MINUI_CHEAT/" || true
         fi
     fi
 
-    mount -o bind "$SDCARD_PATH/Saves/NDS" "$EMU_DIR/backup"
-    mount -o bind "$SDCARD_PATH/Cheats/NDS" "$EMU_DIR/cheats"
-    mount -o bind "$SHARED_USERDATA_PATH/NDS-advanced-drastic" "$EMU_DIR/savestates"
+    mount -o bind "$NDS_MINUI_SAVE" "$EMU_DIR/backup"
+    mount -o bind "$NDS_MINUI_CHEAT" "$EMU_DIR/cheats"
+    mount -o bind "$NDS_SHARE_USERDATA_DIR" "$EMU_DIR/savestates"
 
     # Trigger custom minui-power-control and launch the emulator, make sure to be in the current directory
     cd "$EMU_DIR"
