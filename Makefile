@@ -8,16 +8,26 @@ PUSH_PLATFORM ?= tg5040
 PLATFORMS := tg5040
 
 MINUI_POWER_CONTROL_VERSION := 1.1.0
+UNZIP_DEB_URL := https://archive.debian.org/debian/pool/main/u/unzip/unzip_6.0-23+deb10u2_arm64.deb
 
 clean:
-	rm -f bin/minui-power-control
+	rm -f bin/minui-power-control bin/unzip
 
-build: bin/minui-power-control
+build: bin/minui-power-control bin/unzip
 
 bin/minui-power-control:
 	mkdir -p bin
 	curl -f -o bin/minui-power-control -sSL https://github.com/ben16w/minui-power-control/releases/download/$(MINUI_POWER_CONTROL_VERSION)/minui-power-control
 	chmod +x bin/minui-power-control
+
+bin/unzip:
+	mkdir -p bin
+	$(eval UNZIP_TMP := $(shell mktemp -d))
+	curl -f -o $(UNZIP_TMP)/unzip.deb -sSL $(UNZIP_DEB_URL)
+	cd $(UNZIP_TMP) && ar x unzip.deb && tar xf data.tar.xz
+	cp $(UNZIP_TMP)/usr/bin/unzip bin/unzip
+	chmod +x bin/unzip
+	rm -rf $(UNZIP_TMP)
 
 release: build
 	mkdir -p dist

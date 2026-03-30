@@ -73,6 +73,10 @@ nds_frame_interval_patch() {
 cleanup() {
     rm -f /tmp/stay_awake
 
+    if [ -n "$TEMP_ROM_DIR" ] && [ -d "$TEMP_ROM_DIR" ]; then
+        rm -rf "$TEMP_ROM_DIR"
+    fi
+
     if [ -f "$TEMP_SCALING_FILE" ]; then
         cat "$TEMP_SCALING_FILE" >"$SYSTEM_CPU_POLICY0/$CPU_SCALING_GOVERNOR" || true
         rm -f "$TEMP_SCALING_FILE"
@@ -121,10 +125,20 @@ main() {
     mount -o bind "$NDS_MINUI_CHEAT" "$EMU_DIR/cheats"
     mount -o bind "$NDS_SHARE_USERDATA_DIR" "$EMU_DIR/savestates"
 
+    # Extract zip ROMs to a temp directory before launching
+    ROM_PATH="$*"
+    case "$(echo "$ROM_PATH" | tr '[:upper:]' '[:lower:]')" in
+        *.zip)
+            TEMP_ROM_DIR=$(mktemp -d /tmp/nds_rom_XXXXXX)
+            "$PACK_DIR/bin/unzip" -o "$ROM_PATH" -d "$TEMP_ROM_DIR"
+            ROM_PATH=$(find "$TEMP_ROM_DIR" -name "*.nds" | head -1)
+            ;;
+    esac
+
     # Trigger custom minui-power-control and launch the emulator, make sure to be in the current directory
     cd "$EMU_DIR"
     minui-power-control drastic &
-    "$EMU_DIR/drastic" "$*"
+    "$EMU_DIR/drastic" "$ROM_PATH"
 }
 
 main "$@"
