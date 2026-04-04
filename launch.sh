@@ -60,7 +60,7 @@ nds_buffer_size_patch() {
     case $PLATFORM in
         tg5040)
             export ALSA_CONFIG_PATH="$BRICK_DEVICE_DIR/alsa/nds_alsa.conf"
-            cp "$BRICK_DEVICE_DIR/alsa/.asoundrc" "/root/.asoundrc"
+            export ALSA_ASOUNDRC="$BRICK_DEVICE_DIR/alsa/.asoundrc"
             ;;
         *)
             echo "Unsupported platform: $PLATFORM"
@@ -87,10 +87,6 @@ cleanup() {
     if [ -f "$TEMP_SCALING_MAX_FREQ" ]; then
         cat "$TEMP_SCALING_MAX_FREQ" >"$SYSTEM_CPU_POLICY0/$CPU_SCALING_MAX_FREQ" || true
         rm -f "$TEMP_SCALING_MAX_FREQ"
-    fi
-
-    if [ -f "/root/.asoundrc" ]; then
-        rm -f "/root/.asoundrc"
     fi
 
     umount "$EMU_DIR/backup" || true
