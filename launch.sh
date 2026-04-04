@@ -10,7 +10,6 @@ PACK_DIR="$SDCARD_PATH/Emus/$PLATFORM/NDS.pak"
 BRICK_DEVICE_DIR="$EMU_DIR/devices/trimui-brick"
 
 SYSTEM_CPU_DIR="/sys/devices/system/cpu/cpufreq"
-ALSA_CONF_DIR="/usr/share/alsa"
 # NOTE:(2026-03-29 11:08:18 +07)Most low-end handled devices using share frequency on all core(policy0 affect all available cores). Setting everything here is more than enough
 SYSTEM_CPU_POLICY0="$SYSTEM_CPU_DIR/policy0"
 # NOTE:(2026-03-29 11:08:09 +07)Instead of hardcoding the min/max frequency, we can read it from the system then using awk to pick our desired frequency
@@ -41,7 +40,6 @@ TEMP_ROM_DIR=$(mktemp -d /tmp/nds_rom_XXXXXX)
 export PATH="$EMU_DIR:$PACK_DIR/bin:$PATH"
 export LD_LIBRARY_PATH="$EMU_DIR/libs:$PACK_DIR/lib:$LD_LIBRARY_PATH"
 export HOME="$EMU_DIR"
-export ALSA_CONFIG_PATH="$BRICK_DEVICE_DIR/alsa/nds_alsa.conf"
 
 # NOTE: (2026-03-29 10:49:44 +07)For future researcher, if you have better idea for cpu governor, feel free to add it here. trngaje-advance-drastic current implementation with heavier game or normal game will never use that much cpu load(mostly highest will be ~50%) except when fast forward is toggle. Beside that, especially when using anything but performance governor, when you access menu and wait for a while(cool down cpu load, the current freq now will be the MIN_CPU_FREQ) and resume back, the game cpu freq will be stuck at that $MIN_CPU_FREQ until you reset the game -> stick to one freq and the highest one, which mean performance governor is the best match.
 nds_cpu_configure() {
@@ -62,6 +60,7 @@ nds_buffer_size_patch() {
     echo "Custom setting for $PLATFORM"
     case $PLATFORM in
         tg5040)
+            export ALSA_CONFIG_PATH="$BRICK_DEVICE_DIR/alsa/nds_alsa.conf"
             cp "$BRICK_DEVICE_DIR/alsa/.asoundrc" "/root/.asoundrc"
             ;;
         *)
