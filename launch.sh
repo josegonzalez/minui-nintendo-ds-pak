@@ -58,7 +58,6 @@ nds_cpu_configure() {
     esac
 }
 
-# HACK:(2026-04-04 07:10:52 +07) This patch eliminate the need of injecting interval frame and favorite override alsa config. This patch is only for tg5040(TrimUI Brick/TrimUI Smart Pro) latest firmware(>=1.1.1).
 nds_buffer_size_patch() {
     echo "Custom setting for $PLATFORM"
     case $PLATFORM in
