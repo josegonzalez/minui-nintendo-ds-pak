@@ -9,6 +9,7 @@ EMU_DIR="$SDCARD_PATH/Emus/$PLATFORM/NDS.pak/drastic"
 PACK_DIR="$SDCARD_PATH/Emus/$PLATFORM/NDS.pak"
 
 SYSTEM_CPU_DIR="/sys/devices/system/cpu/cpufreq"
+ALSA_CONF_DIR="/usr/share/alsa"
 # NOTE:(2026-03-29 11:08:18 +07)Most low-end handled devices using share frequency on all core(policy0 affect all available cores). Setting everything here is more than enough
 SYSTEM_CPU_POLICY0="$SYSTEM_CPU_DIR/policy0"
 # NOTE:(2026-03-29 11:08:09 +07)Instead of hardcoding the min/max frequency, we can read it from the system then using awk to pick our desired frequency
@@ -29,9 +30,14 @@ TEMP_PREFIX=system_
 CPU_SCALING_GOVERNOR=scaling_governor
 CPU_SCALING_MIN_FREQ=scaling_min_freq
 CPU_SCALING_MAX_FREQ=scaling_max_freq
+ALSA_CONF="alsa.conf"
 TEMP_SCALING_FILE="$NDS_USERDATA_DIR/$TEMP_PREFIX$CPU_SCALING_GOVERNOR.txt"
 TEMP_SCALING_MIN_FREQ="$NDS_USERDATA_DIR/$TEMP_PREFIX$CPU_SCALING_MIN_FREQ.txt"
 TEMP_SCALING_MAX_FREQ="$NDS_USERDATA_DIR/$TEMP_PREFIX$CPU_SCALING_MAX_FREQ.txt"
+TEMP_ALSA_CONF="$NDS_USERDATA_DIR/$TEMP_PREFIX$ALSA_CONF.txt"
+
+# NOTE: (2026-04-04 07:29:58 +07) The clean up function will stop right from beginning because TEMP_ROM_DIR is not exist yet.
+TEMP_ROM_DIR=$(mktemp -d /tmp/nds_rom_XXXXXX)
 
 export PATH="$EMU_DIR:$PACK_DIR/bin:$PATH"
 export LD_LIBRARY_PATH="$EMU_DIR/libs:$PACK_DIR/lib:$LD_LIBRARY_PATH"
@@ -52,22 +58,23 @@ nds_cpu_configure() {
     esac
 }
 
-# Hack: Force the emulator to run in more stable speed, the UI doesn't provide the option and setting this in the config file will cause the UI to display as none, but the emulator will run in 100%. This has been careful calculate and test to match the best speed it could. Below is the map for the frame_interval value with "Performance->Speed override" setting
-# 0 - none
-# 100000 - 50%
-# 47619 - ~105% -> Just enough so the sound will be as less off sync as possible
-# 33333 - 150%
-# 25000 - 200%
-# 20000 - 250%
-# 16666 - 300%
-nds_frame_interval_patch() {
-    find "$EMU_DIR/config" -name "*.cfg" | while read -r CONFIG_PATH; do
-        # If the frame_interval is not 47619 or 100000, set it to 47619
-        NDS_CONFIG_SHOULD_PATCH=$(awk -F' = ' '/^frame_interval/ {print !($2>=47619 || $2==100000)}' "$CONFIG_PATH")
-        if [ "$NDS_CONFIG_SHOULD_PATCH" -eq 1 ]; then
-            sed -i 's/frame_interval *= .*/frame_interval = 47619/' "$CONFIG_PATH"
-        fi
-    done
+# HACK:(2026-04-04 07:10:52 +07) This patch eliminate the need of injecting interval frame and favorite override alsa config. This patch is only for tg5040(TrimUI Brick/TrimUI Smart Pro) latest firmware(>=1.1.1).
+nds_buffer_size_patch() {
+    echo "Custom setting for $PLATFORM"
+    case $PLATFORM in
+        tg5040)
+            if [ ! -f "$TEMP_ALSA_CONF" ]; then
+                cp "$ALSA_CONF_DIR/$ALSA_CONF" "$TEMP_ALSA_CONF"
+            fi
+            # The path `~/.asoundrc` is not working, we have to modified it to `/root/.asoundrc` so our file can be loaded.
+            sed -i 's/~\/.asoundrc/\/root\/.asoundrc/' "$ALSA_CONF_DIR/$ALSA_CONF" || true
+            cp "$PACK_DIR/.asoundrc" "/root/.asoundrc"
+            ;;
+        *)
+            echo "Unsupported platform: $1"
+            ;;
+    esac
+
 }
 
 cleanup() {
@@ -88,6 +95,13 @@ cleanup() {
     if [ -f "$TEMP_SCALING_MAX_FREQ" ]; then
         cat "$TEMP_SCALING_MAX_FREQ" >"$SYSTEM_CPU_POLICY0/$CPU_SCALING_MAX_FREQ" || true
         rm -f "$TEMP_SCALING_MAX_FREQ"
+    fi
+
+    if [ -f "$TEMP_ALSA_CONF" ]; then
+        cp "$TEMP_ALSA_CONF" "$ALSA_CONF_DIR/$ALSA_CONF"
+    fi
+    if [ -f "/root/.asoundrc" ]; then
+        rm -f "/root/.asoundrc"
     fi
 
     umount "$EMU_DIR/backup" || true
@@ -113,7 +127,7 @@ main() {
 
     # Predefined cpu profile for drastic
     nds_cpu_configure performance
-    nds_frame_interval_patch
+    nds_buffer_size_patch
 
     if [ -d "$EMU_DIR/cheats" ]; then
         if ls -A "$EMU_DIR/cheats" | grep -q .; then
@@ -129,7 +143,6 @@ main() {
     ROM_PATH="$*"
     case "$(echo "$ROM_PATH" | tr '[:upper:]' '[:lower:]')" in
         *.zip)
-            TEMP_ROM_DIR=$(mktemp -d /tmp/nds_rom_XXXXXX)
             "$PACK_DIR/bin/unzip" -o "$ROM_PATH" -d "$TEMP_ROM_DIR"
             ROM_PATH=$(find "$TEMP_ROM_DIR" -name "*.nds" | head -1)
             ;;

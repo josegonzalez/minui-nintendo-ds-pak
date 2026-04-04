@@ -1,0 +1,2 @@
+pcm.PlaybackDmix.slave.pcm.slave.period_size 1024;
+pcm.PlaybackDmix.slave.pcm.slave.buffer_size 4096;
