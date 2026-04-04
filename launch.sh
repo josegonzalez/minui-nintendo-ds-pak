@@ -7,6 +7,7 @@ echo "$0" "$@"
 
 EMU_DIR="$SDCARD_PATH/Emus/$PLATFORM/NDS.pak/drastic"
 PACK_DIR="$SDCARD_PATH/Emus/$PLATFORM/NDS.pak"
+BRICK_DEVICE_DIR="$EMU_DIR/devices/trimui-brick"
 
 SYSTEM_CPU_DIR="/sys/devices/system/cpu/cpufreq"
 ALSA_CONF_DIR="/usr/share/alsa"
@@ -30,11 +31,9 @@ TEMP_PREFIX=system_
 CPU_SCALING_GOVERNOR=scaling_governor
 CPU_SCALING_MIN_FREQ=scaling_min_freq
 CPU_SCALING_MAX_FREQ=scaling_max_freq
-ALSA_CONF="alsa.conf"
 TEMP_SCALING_FILE="$NDS_USERDATA_DIR/$TEMP_PREFIX$CPU_SCALING_GOVERNOR.txt"
 TEMP_SCALING_MIN_FREQ="$NDS_USERDATA_DIR/$TEMP_PREFIX$CPU_SCALING_MIN_FREQ.txt"
 TEMP_SCALING_MAX_FREQ="$NDS_USERDATA_DIR/$TEMP_PREFIX$CPU_SCALING_MAX_FREQ.txt"
-TEMP_ALSA_CONF="$NDS_USERDATA_DIR/$TEMP_PREFIX$ALSA_CONF.txt"
 
 # NOTE: (2026-04-04 07:29:58 +07) The clean up function will stop right from beginning because TEMP_ROM_DIR is not exist yet.
 TEMP_ROM_DIR=$(mktemp -d /tmp/nds_rom_XXXXXX)
@@ -42,6 +41,7 @@ TEMP_ROM_DIR=$(mktemp -d /tmp/nds_rom_XXXXXX)
 export PATH="$EMU_DIR:$PACK_DIR/bin:$PATH"
 export LD_LIBRARY_PATH="$EMU_DIR/libs:$PACK_DIR/lib:$LD_LIBRARY_PATH"
 export HOME="$EMU_DIR"
+export ALSA_CONFIG_PATH="$BRICK_DEVICE_DIR/alsa/nds_alsa.conf"
 
 # NOTE: (2026-03-29 10:49:44 +07)For future researcher, if you have better idea for cpu governor, feel free to add it here. trngaje-advance-drastic current implementation with heavier game or normal game will never use that much cpu load(mostly highest will be ~50%) except when fast forward is toggle. Beside that, especially when using anything but performance governor, when you access menu and wait for a while(cool down cpu load, the current freq now will be the MIN_CPU_FREQ) and resume back, the game cpu freq will be stuck at that $MIN_CPU_FREQ until you reset the game -> stick to one freq and the highest one, which mean performance governor is the best match.
 nds_cpu_configure() {
@@ -62,12 +62,7 @@ nds_buffer_size_patch() {
     echo "Custom setting for $PLATFORM"
     case $PLATFORM in
         tg5040)
-            if [ ! -f "$TEMP_ALSA_CONF" ]; then
-                cp "$ALSA_CONF_DIR/$ALSA_CONF" "$TEMP_ALSA_CONF"
-            fi
-            # The path `~/.asoundrc` is not working, we have to modified it to `/root/.asoundrc` so our file can be loaded.
-            sed -i 's/~\/.asoundrc/\/root\/.asoundrc/' "$ALSA_CONF_DIR/$ALSA_CONF" || true
-            cp "$PACK_DIR/.asoundrc" "/root/.asoundrc"
+            cp "$BRICK_DEVICE_DIR/alsa/.asoundrc" "/root/.asoundrc"
             ;;
         *)
             echo "Unsupported platform: $PLATFORM"
@@ -96,9 +91,6 @@ cleanup() {
         rm -f "$TEMP_SCALING_MAX_FREQ"
     fi
 
-    if [ -f "$TEMP_ALSA_CONF" ]; then
-        cp "$TEMP_ALSA_CONF" "$ALSA_CONF_DIR/$ALSA_CONF"
-    fi
     if [ -f "/root/.asoundrc" ]; then
         rm -f "/root/.asoundrc"
     fi
