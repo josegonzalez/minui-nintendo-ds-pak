@@ -71,7 +71,7 @@ nds_buffer_size_patch() {
             cp "$PACK_DIR/.asoundrc" "/root/.asoundrc"
             ;;
         *)
-            echo "Unsupported platform: $1"
+            echo "Unsupported platform: $PLATFORM"
             ;;
     esac
 
