@@ -7,6 +7,7 @@ echo "$0" "$@"
 
 EMU_DIR="$SDCARD_PATH/Emus/$PLATFORM/NDS.pak/drastic"
 PACK_DIR="$SDCARD_PATH/Emus/$PLATFORM/NDS.pak"
+BRICK_DEVICE_DIR="$EMU_DIR/devices/trimui-brick"
 
 SYSTEM_CPU_DIR="/sys/devices/system/cpu/cpufreq"
 # NOTE:(2026-03-29 11:08:18 +07)Most low-end handled devices using share frequency on all core(policy0 affect all available cores). Setting everything here is more than enough
@@ -33,6 +34,8 @@ TEMP_SCALING_FILE="$NDS_USERDATA_DIR/$TEMP_PREFIX$CPU_SCALING_GOVERNOR.txt"
 TEMP_SCALING_MIN_FREQ="$NDS_USERDATA_DIR/$TEMP_PREFIX$CPU_SCALING_MIN_FREQ.txt"
 TEMP_SCALING_MAX_FREQ="$NDS_USERDATA_DIR/$TEMP_PREFIX$CPU_SCALING_MAX_FREQ.txt"
 
+TEMP_ROM_DIR=$(mktemp -d /tmp/nds_rom_XXXXXX)
+
 export PATH="$EMU_DIR:$PACK_DIR/bin:$PATH"
 export LD_LIBRARY_PATH="$EMU_DIR/libs:$PACK_DIR/lib:$LD_LIBRARY_PATH"
 export HOME="$EMU_DIR"
@@ -52,22 +55,18 @@ nds_cpu_configure() {
     esac
 }
 
-# Hack: Force the emulator to run in more stable speed, the UI doesn't provide the option and setting this in the config file will cause the UI to display as none, but the emulator will run in 100%. This has been careful calculate and test to match the best speed it could. Below is the map for the frame_interval value with "Performance->Speed override" setting
-# 0 - none
-# 100000 - 50%
-# 47619 - ~105% -> Just enough so the sound will be as less off sync as possible
-# 33333 - 150%
-# 25000 - 200%
-# 20000 - 250%
-# 16666 - 300%
-nds_frame_interval_patch() {
-    find "$EMU_DIR/config" -name "*.cfg" | while read -r CONFIG_PATH; do
-        # If the frame_interval is not 47619 or 100000, set it to 47619
-        NDS_CONFIG_SHOULD_PATCH=$(awk -F' = ' '/^frame_interval/ {print !($2>=47619 || $2==100000)}' "$CONFIG_PATH")
-        if [ "$NDS_CONFIG_SHOULD_PATCH" -eq 1 ]; then
-            sed -i 's/frame_interval *= .*/frame_interval = 47619/' "$CONFIG_PATH"
-        fi
-    done
+nds_buffer_size_patch() {
+    echo "Custom setting for $PLATFORM"
+    case $PLATFORM in
+        tg5040)
+            export ALSA_CONFIG_PATH="$BRICK_DEVICE_DIR/alsa/nds_alsa.conf"
+            export ALSA_ASOUNDRC="$BRICK_DEVICE_DIR/alsa/.asoundrc"
+            ;;
+        *)
+            echo "Unsupported platform: $PLATFORM"
+            ;;
+    esac
+
 }
 
 cleanup() {
@@ -113,7 +112,7 @@ main() {
 
     # Predefined cpu profile for drastic
     nds_cpu_configure performance
-    nds_frame_interval_patch
+    nds_buffer_size_patch
 
     if [ -d "$EMU_DIR/cheats" ]; then
         if ls -A "$EMU_DIR/cheats" | grep -q .; then
@@ -129,7 +128,6 @@ main() {
     ROM_PATH="$*"
     case "$(echo "$ROM_PATH" | tr '[:upper:]' '[:lower:]')" in
         *.zip)
-            TEMP_ROM_DIR=$(mktemp -d /tmp/nds_rom_XXXXXX)
             "$PACK_DIR/bin/unzip" -o "$ROM_PATH" -d "$TEMP_ROM_DIR"
             ROM_PATH=$(find "$TEMP_ROM_DIR" -name "*.nds" | head -1)
             ;;
