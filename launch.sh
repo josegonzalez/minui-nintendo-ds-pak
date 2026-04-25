@@ -46,6 +46,10 @@ nds_cpu_configure() {
     case $1 in
         performance)
             echo "$1" >"$SYSTEM_CPU_POLICY0/$CPU_SCALING_GOVERNOR" || true
+            echo "$PREFER_CPU_FREQ" >"$SYSTEM_CPU_POLICY0/scaling_max_freq" || true
+            ;;
+        ondemand)
+            echo "$1" >"$SYSTEM_CPU_POLICY0/$CPU_SCALING_GOVERNOR" || true
             echo "$MIN_CPU_FREQ" >"$SYSTEM_CPU_POLICY0/scaling_min_freq" || true
             echo "$PREFER_CPU_FREQ" >"$SYSTEM_CPU_POLICY0/scaling_max_freq" || true
             ;;
@@ -111,7 +115,7 @@ main() {
     cat "$SYSTEM_CPU_POLICY0/$CPU_SCALING_MAX_FREQ" >"$TEMP_SCALING_MAX_FREQ"
 
     # Predefined cpu profile for drastic
-    nds_cpu_configure performance
+    nds_cpu_configure ondemand
     nds_buffer_size_patch
 
     if [ -d "$EMU_DIR/cheats" ]; then
