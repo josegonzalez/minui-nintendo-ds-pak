@@ -140,7 +140,7 @@ main() {
     # Trigger custom minui-power-control and launch the emulator, make sure to be in the current directory
     cd "$EMU_DIR"
     minui-power-control drastic &
-    "$EMU_DIR/drastic" "$ROM_PATH"
+    LD_PRELOAD=$EMU_DIR/libs/libadvdrastic.so "$EMU_DIR/drastic" "$ROM_PATH"
 }
 
 main "$@"
