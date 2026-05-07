@@ -6,7 +6,8 @@
   "repo_url": "https://github.com/josegonzalez/minui-nintendo-ds-pak",
   "release_filename": "NDS.pak.zip",
   "platforms": [
-    "tg5040"
+    "tg5040",
+    "tg5050"
   ],
   "update_ignore": [
     "drastic/config/drastic.cfg",
