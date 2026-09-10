@@ -1,6 +1,6 @@
 dist
+tmp
 bin/*
 !bin/.gitkeep
 res/fonts/*
 !res/fonts/.gitkeep
-!bin/.gitkeep
