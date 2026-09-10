@@ -1,0 +1,31 @@
+---
+name: "test"
+
+# yamllint disable-line rule:truthy
+on:
+  pull_request:
+    branches:
+      - "*"
+  push:
+    branches:
+      - "main"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  bats:
+    name: bats
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Clone
+        uses: actions/checkout@v7
+
+      - name: Install bats
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bats
+
+      - name: Run tests
+        run: make test
