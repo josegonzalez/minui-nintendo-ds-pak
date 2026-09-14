@@ -5,7 +5,7 @@ PAK_FOLDER := $(shell echo $(PAK_TYPE) | cut -c1)$(shell echo $(PAK_TYPE) | tr '
 PUSH_SDCARD_PATH ?= /mnt/SDCARD
 PUSH_PLATFORM ?= tg5040
 
-PLATFORMS := tg5040
+PLATFORMS := h700 tg5040 tg5050
 
 MINUI_POWER_CONTROL_VERSION := 1.1.0
 UNZIP_DEB_URL := https://archive.debian.org/debian/pool/main/u/unzip/unzip_6.0-23+deb10u2_arm64.deb
@@ -29,6 +29,13 @@ bin/unzip:
 	chmod +x bin/unzip
 	rm -rf $(UNZIP_TMP)
 
+lint:
+	shellcheck -s sh launch.sh
+	shfmt -l -d -i 4 launch.sh test/launch.bats
+
+test:
+	bats test
+
 release: build
 	mkdir -p dist
 	git archive --format=zip --output "dist/$(PAK_NAME).pak.zip" HEAD
@@ -45,3 +52,5 @@ push: release
 	rm -rf "dist/$(PAK_NAME).pak"
 	cd dist && unzip "$(PAK_NAME).pak.zip" -d "$(PAK_NAME).pak"
 	adb push "dist/$(PAK_NAME).pak/." "$(PUSH_SDCARD_PATH)/$(PAK_FOLDER)/$(PUSH_PLATFORM)/$(PAK_NAME).pak"
+
+.PHONY: build clean lint push release test

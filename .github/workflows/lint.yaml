@@ -1,0 +1,63 @@
+---
+name: "lint"
+
+# yamllint disable-line rule:truthy
+on:
+  pull_request:
+    branches:
+      - "*"
+  push:
+    branches:
+      - "main"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  markdown-lint:
+    name: markdown-lint
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Clone
+        uses: actions/checkout@v7
+      - name: Run markdown-lint
+        uses: avto-dev/markdown-lint@04d43ee9191307b50935a753da3b775ab695eceb
+        with:
+          config: ".github/linters/.markdown-lint.yaml"
+          args: "./README.md"
+
+  shellcheck:
+    name: shellcheck
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Clone
+        uses: actions/checkout@v7
+      - name: Run shellcheck
+        uses: ludeeus/action-shellcheck@00cae500b08a931fb5698e11e79bfbd38e612a38
+        env:
+          SHELLCHECK_OPTS: -s sh
+
+  shfmt:
+    name: shfmt
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Clone
+        uses: actions/checkout@v7
+      - name: Run shfmt
+        uses: luizm/action-sh-checker@17bd25a6ee188d2b91f677060038f4ba37ba14b2
+        env:
+          SHFMT_OPTS: -l -d -i 4
+        with:
+          sh_checker_shellcheck_disable: true
+
+  yamllint:
+    name: yamllint
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Clone
+        uses: actions/checkout@v7
+      - name: Run yamllint
+        uses: ibiqlik/action-yamllint@2576378a8e339169678f9939646ee3ee325e845c
+        with:
+          config_file: ".github/linters/.yamllint.yaml"
