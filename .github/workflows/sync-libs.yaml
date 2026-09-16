@@ -1,0 +1,49 @@
+---
+name: "sync-libs"
+
+# yamllint disable-line rule:truthy
+on:
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  sync:
+    name: sync
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Fetch latest libadvdrastic.so
+        run: |
+          curl -fsSL -o /tmp/libadvdrastic.so \
+            https://raw.githubusercontent.com/trngaje/advanced_drastic/master/libs/tsp/libadvdrastic.so
+
+      - name: Check for changes
+        id: diff
+        run: |
+          if ! cmp -s /tmp/libadvdrastic.so drastic/libs/libadvdrastic.so; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Update binary
+        if: steps.diff.outputs.changed == 'true'
+        run: |
+          cp /tmp/libadvdrastic.so drastic/libs/libadvdrastic.so
+          chmod 755 drastic/libs/libadvdrastic.so
+
+      - name: Open PR
+        if: steps.diff.outputs.changed == 'true'
+        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1  # v8.1.1
+        with:
+          commit-message: "build(libs): sync libadvdrastic.so from trngaje/advanced_drastic"
+          title: "build(libs): sync libadvdrastic.so from upstream"
+          body: |
+            Automated check found a newer libadvdrastic.so at trngaje/advanced_drastic (libs/tsp), different from what's committed here. Review and test before merging.
+          branch: build/sync-libadvdrastic
+          delete-branch: true
