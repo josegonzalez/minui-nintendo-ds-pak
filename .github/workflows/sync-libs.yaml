@@ -22,7 +22,7 @@ jobs:
       - name: Fetch latest libadvdrastic.so
         run: |
           curl -fsSL -o /tmp/libadvdrastic.so \
-            https://raw.githubusercontent.com/trngaje/advanced_drastic/main/libs/tsp/libadvdrastic.so
+            https://raw.githubusercontent.com/trngaje/advanced_drastic/master/libs/tsp/libadvdrastic.so
 
       - name: Check for changes
         id: diff
