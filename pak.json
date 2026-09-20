@@ -16,5 +16,5 @@
     "drastic/resources/settings.json"
   ],
   "launch": "launch.sh",
-  "version": "0.13.1"
+  "version": "0.13.2"
 }
