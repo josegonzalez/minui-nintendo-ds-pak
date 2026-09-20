@@ -24,7 +24,7 @@ Use the correct platform for your device. The `h700` and `tg5050` platforms are 
 
 ## Device Configuration
 
-Advanced Drastic ships a separate configuration per device, and they differ in screen orientation and button mapping. On the first launch the pak picks the profile that matches your device and copies it into `drastic/config/`, then records the choice in `/.userdata/$PLATFORM/NDS-advanced-drastic/device.txt`. The previous configuration is kept alongside it as `drastic.cfg.bak`.
+Advanced Drastic ships a separate configuration per device, and they differ in screen orientation and button mapping. The pak picks the profile that matches your device and copies it into `drastic/config/`, then records the choice in `/.userdata/$PLATFORM/NDS-advanced-drastic/device.txt`.
 
 | Device | Profile |
 | --- | --- |
@@ -39,7 +39,9 @@ Advanced Drastic ships a separate configuration per device, and they differ in s
 
 Devices without a profile of their own use the closest one, chosen by whether the device has analog sticks.
 
-Seeding only happens once per device, so any remapping done inside the Drastic settings menu is kept on later launches. Delete `device.txt` to have the profile applied again.
+The profile is applied when the recorded device does not match, and also whenever the configuration is still the one the pak ships. Reinstalling the pak restores that shipped configuration, so the right profile is applied again on the next launch. Any remapping done inside the Drastic settings menu is kept across launches and across pak updates, and a configuration you had changed is kept as `drastic.cfg.bak` next to `device.txt` before it is replaced. To start over from your device's profile, delete `drastic/config/drastic.cfg`.
+
+Drastic also writes a per-game configuration to `drastic/config/<game>.cfg`, which overrides the global one. If a single game still has the wrong buttons after the profile is applied, delete that file.
 
 ## Key Controls
 

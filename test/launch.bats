@@ -37,7 +37,33 @@ fake_pak() {
 }
 
 config_value() {
-    awk -F' *= *' -v key="$1" '$1 == key { print $2 }' "$EMU_DIR/config/drastic.cfg"
+    awk -F' *= *' -v key="$1" '$1 == key { print $2 }' "${2:-$EMU_DIR/config/drastic.cfg}"
+}
+
+profile_config() {
+    echo "$REPO_DIR/drastic/devices/$1/config/drastic.cfg"
+}
+
+# Stand in for a Pak Store reinstall, which restores the config from the release archive while
+# device.txt survives in userdata.
+restore_shipped_config() {
+    cp -f "$REPO_DIR/drastic/config/drastic.cfg" "$EMU_DIR/config/drastic.cfg"
+}
+
+# Stand in for a remap saved from the DraStic menu. nds_config_set treats its key as a regex, so
+# it cannot reach a bracketed control name.
+remap_control() {
+    sed "s/^$(echo "$1" | sed 's/[][]/\\&/g') = .*/$1 = $2/" \
+        "$EMU_DIR/config/drastic.cfg" >"$EMU_DIR/config/drastic.cfg.remap"
+    mv -f "$EMU_DIR/config/drastic.cfg.remap" "$EMU_DIR/config/drastic.cfg"
+}
+
+shipped_configs() {
+    echo "$REPO_DIR/drastic/config/drastic.cfg" "$REPO_DIR"/drastic/devices/*/config/drastic.cfg
+}
+
+h700_profiles() {
+    echo rg28xx rg35xx-sp rg40xx-h rg40xx-v rg-cubexx
 }
 
 @test "tg3040 without a device is normalized to a tg5040 brick" {
@@ -112,7 +138,7 @@ config_value() {
     [ "$status" -eq 0 ]
 }
 
-@test "seeding backs up the config it replaces" {
+@test "seeding backs up a config the player changed" {
     fake_pak h700 rg40xxv
 
     echo "custom" >"$EMU_DIR/config/drastic.cfg"
@@ -139,7 +165,7 @@ config_value() {
     [ "$status" -eq 0 ]
 }
 
-@test "seeding does not run again for the same device" {
+@test "a config the player changed is kept for the same device" {
     fake_pak h700 rg40xxv
 
     nds_seed_device_config rg40xx-v
@@ -147,6 +173,102 @@ config_value() {
     nds_seed_device_config rg40xx-v
 
     [ "$(cat "$EMU_DIR/config/drastic.cfg")" = "remapped" ]
+    [ "$(cat "$NDS_DEVICE_FILE")" = "rg40xx-v" ]
+}
+
+@test "a config the player saved from the drastic menu is kept" {
+    fake_pak h700 rg40xxv
+
+    nds_seed_device_config rg40xx-v
+    remap_control "controls_b[CONTROL_INDEX_MENU]" 1039
+    nds_seed_device_config rg40xx-v
+
+    [ "$(config_value "controls_b[CONTROL_INDEX_MENU]")" = "1039" ]
+    [ ! -f "$NDS_USERDATA_DIR/drastic.cfg.bak" ]
+}
+
+# The bug in issue 83: a Pak Store reinstall restores the shipped Trimui config while device.txt
+# survives in userdata, which used to put the DraStic menu on R1 (1032) instead of Menu (1035).
+@test "a reinstall that restores the shipped config is re-seeded" {
+    fake_pak h700 rg35xxsp
+
+    nds_seed_device_config rg35xx-sp
+    nds_sav_format_patch
+    restore_shipped_config
+    [ "$(config_value "controls_b[CONTROL_INDEX_MENU]")" = "1032" ]
+
+    nds_seed_device_config rg35xx-sp
+
+    [ "$(config_value "controls_b[CONTROL_INDEX_MENU]")" = "1035" ]
+}
+
+@test "a reinstall restores the profile settings.json" {
+    fake_pak h700 rg28xx
+
+    nds_seed_device_config rg28xx
+    cp -f "$REPO_DIR/drastic/resources/settings.json" "$EMU_DIR/resources/settings.json"
+    restore_shipped_config
+
+    nds_seed_device_config rg28xx
+
+    run grep -q display_rotate "$EMU_DIR/resources/settings.json"
+    [ "$status" -eq 0 ]
+}
+
+# Copying a sibling profile over the config by hand is the obvious workaround for a device the
+# mapping guesses wrong, so it has to survive even though those bytes are a shipped profile's.
+@test "a hand installed sibling profile is kept" {
+    fake_pak h700 rg34xx
+
+    nds_seed_device_config rg35xx-sp
+    cp -f "$(profile_config rg40xx-h)" "$EMU_DIR/config/drastic.cfg"
+    nds_seed_device_config rg35xx-sp
+
+    run diff "$EMU_DIR/config/drastic.cfg" "$(profile_config rg40xx-h)"
+    [ "$status" -eq 0 ]
+}
+
+@test "seeding a config that already matches the profile changes nothing" {
+    fake_pak h700 rg40xxv
+
+    nds_seed_device_config rg40xx-v
+    nds_seed_device_config rg40xx-v
+
+    [ "$(cat "$NDS_DEVICE_FILE")" = "rg40xx-v" ]
+    run diff "$EMU_DIR/config/drastic.cfg" "$EMU_DIR/devices/rg40xx-v/config/drastic.cfg"
+    [ "$status" -eq 0 ]
+    [ ! -f "$NDS_USERDATA_DIR/drastic.cfg.bak" ]
+}
+
+@test "an existing backup survives a re-seed of a shipped config" {
+    fake_pak h700 rg40xxv
+
+    echo "custom" >"$EMU_DIR/config/drastic.cfg"
+    nds_seed_device_config rg40xx-v
+    restore_shipped_config
+    nds_seed_device_config rg40xx-v
+
+    [ "$(cat "$NDS_USERDATA_DIR/drastic.cfg.bak")" = "custom" ]
+}
+
+@test "a deleted config is restored for the recorded device" {
+    fake_pak h700 rg40xxv
+
+    nds_seed_device_config rg40xx-v
+    rm -f "$EMU_DIR/config/drastic.cfg"
+    nds_seed_device_config rg40xx-v
+
+    run diff "$EMU_DIR/config/drastic.cfg" "$EMU_DIR/devices/rg40xx-v/config/drastic.cfg"
+    [ "$status" -eq 0 ]
+}
+
+# Sourcing launch.sh never runs main, so the suite cannot otherwise catch a helper that strands a
+# non-zero status and aborts the launch before the bind mounts.
+@test "seeding is safe under errexit" {
+    fake_pak h700 rg40xxv
+
+    run sh -ec '. "$REPO_DIR/launch.sh"; nds_init_env; nds_seed_device_config rg40xx-v; nds_seed_device_config rg40xx-v'
+    [ "$status" -eq 0 ]
 }
 
 @test "seeding runs again when the device changes" {
@@ -167,7 +289,20 @@ config_value() {
     nds_seed_device_config nonexistent
 
     [ ! -f "$NDS_DEVICE_FILE" ]
+    [ ! -f "$NDS_USERDATA_DIR/drastic.cfg.bak" ]
     run diff "$EMU_DIR/config/drastic.cfg" "$REPO_DIR/drastic/config/drastic.cfg"
+    [ "$status" -eq 0 ]
+}
+
+# The shipped config being a byte copy of one profile is what lets seeding tell a fresh extract
+# of the pak apart from a config the player has saved.
+@test "the shipped config is a copy of the profile launch.sh names" {
+    [ "$NDS_SHIPPED_PROFILE" = "trimui-brick" ]
+
+    run diff "$REPO_DIR/drastic/config/drastic.cfg" "$(profile_config trimui-brick)"
+    [ "$status" -eq 0 ]
+    run diff "$REPO_DIR/drastic/config/drastic.cf2" \
+        "$REPO_DIR/drastic/devices/trimui-brick/config/drastic.cf2"
     [ "$status" -eq 0 ]
 }
 
@@ -175,7 +310,7 @@ config_value() {
     fake_pak h700 rg35xxsp
 
     nds_seed_device_config rg35xx-sp
-    [ "$(config_value backup_use_sav_format)" = "0" ]
+    nds_config_set "$EMU_DIR/config/drastic.cfg" backup_use_sav_format 0
 
     nds_sav_format_patch
     [ "$(config_value backup_use_sav_format)" = "1" ]
@@ -185,12 +320,71 @@ config_value() {
     fake_pak h700 rg35xxsp
 
     nds_seed_device_config rg35xx-sp
+    nds_config_set "$EMU_DIR/config/drastic.cfg" backup_use_sav_format 0
     before="$(grep -cv backup_use_sav_format "$EMU_DIR/config/drastic.cfg")"
     nds_sav_format_patch
     after="$(grep -cv backup_use_sav_format "$EMU_DIR/config/drastic.cfg")"
 
     [ "$before" = "$after" ]
     [ "$(config_value screen_orientation)" = "0" ]
+}
+
+@test "every device profile already enables the sav format" {
+    for config in $(shipped_configs); do
+        [ "$(config_value backup_use_sav_format "$config")" = "1" ]
+    done
+}
+
+# The original bug at the data layer: the shipped config binds the menu to Trimui button 8, which
+# is R1 on an h700, so an h700 running it opens the DraStic menu with R1.
+@test "profiles bind the menu to their own menu button" {
+    for profile in $(h700_profiles); do
+        [ "$(config_value "controls_b[CONTROL_INDEX_MENU]" "$(profile_config "$profile")")" = "1035" ]
+    done
+    for profile in trimui-brick trimui-smart-pro; do
+        [ "$(config_value "controls_b[CONTROL_INDEX_MENU]" "$(profile_config "$profile")")" = "1032" ]
+    done
+}
+
+@test "every h700 profile can navigate and leave the drastic menu" {
+    for profile in $(h700_profiles); do
+        config="$(profile_config "$profile")"
+        [ "$(config_value "controls_b[CONTROL_INDEX_UI_SELECT]" "$config")" = "1027" ]
+        [ "$(config_value "controls_b[CONTROL_INDEX_UI_BACK]" "$config")" != "65535" ]
+        [ "$(config_value "controls_b[CONTROL_INDEX_UI_EXIT]" "$config")" != "65535" ]
+    done
+}
+
+# README: "Select + L: Quick load", "Select + R: Quick save".
+@test "every h700 profile puts quick save on R and quick load on L" {
+    for profile in $(h700_profiles); do
+        config="$(profile_config "$profile")"
+        [ "$(config_value "controls_b[CONTROL_INDEX_HOT_SAVE_STATE]" "$config")" = "1032" ]
+        [ "$(config_value "controls_b[CONTROL_INDEX_HOT_LOAD_STATE]" "$config")" = "1031" ]
+    done
+}
+
+@test "every shipped config binds the same keys in the same order" {
+    reference="$(sed 's/ =.*//' "$REPO_DIR/drastic/config/drastic.cfg")"
+
+    for config in $(shipped_configs); do
+        [ "$(sed 's/ =.*//' "$config")" = "$reference" ]
+    done
+}
+
+# libadvdrastic.so dropped CONTROL_INDEX_SWAP_ORIENTATION_A/B and renamed the layout controls, so
+# a config still using the old names loses those bindings silently.
+@test "every shipped config speaks the schema the bundled library writes" {
+    for config in $(shipped_configs); do
+        run grep -qE "SWAP_ORIENTATION|CHANGE_LAYOUT_DEC|CHANGE_LAYOUT_INC" "$config"
+        [ "$status" -ne 0 ]
+
+        for key in ADVANCE_CONTROL_INDEX_CHANGE_LAYOUT_PREV CONTROL_INDEX_HOT_CHANGE_LAYOUT_PREV \
+            CONTROL_INDEX_HOLD_FAST_FORWARD CONTROL_INDEX_HOT_TOGGLE_SHOW_FRAME_COUNTER; do
+            run grep -q "^controls_b\[$key\] = " "$config"
+            [ "$status" -eq 0 ]
+        done
+    done
 }
 
 @test "setting a config key rewrites only that key" {
