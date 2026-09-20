@@ -17,6 +17,11 @@ NDS_PREFERRED_CPU_FREQ=1608000
 # minui-power-control refuses to start outside this list, so h700 gets no deep sleep yet
 NDS_POWER_CONTROL_PLATFORMS="tg5040 tg5050 my355 rg35xxplus miyoomini"
 
+# drastic/config/drastic.cfg ships as a byte copy of this profile's config, so a live config
+# holding those exact bytes is one a fresh extract of the pak just laid down. A test keeps the
+# constant and the shipped bytes from drifting apart.
+NDS_SHIPPED_PROFILE=trimui-brick
+
 # NextUI reports the Trimui Brick as tg5040 with DEVICE=brick. Older MinUI builds
 # reported it as its own tg3040 platform with no DEVICE at all.
 nds_normalize_platform() {
@@ -176,36 +181,74 @@ nds_device_profile() {
     esac
 }
 
-# Seed once per device so that remapping done inside the DraStic settings menu survives
-# later launches. The previous config is kept next to the marker file.
+# busybox usually has cmp, but a stripped build would leave the seeding checks below silently
+# unable to spot a reinstall, so fall back to comparing size and then contents. The configs are
+# small text files with no NUL bytes, which makes that comparison exact.
+nds_files_match() {
+    [ -f "$1" ] && [ -f "$2" ] || return 1
+
+    if command -v cmp >/dev/null 2>&1; then
+        if cmp -s "$1" "$2"; then
+            return 0
+        fi
+        return 1
+    fi
+
+    [ "$(wc -c <"$1")" = "$(wc -c <"$2")" ] || return 1
+    [ "$(cat "$1")" = "$(cat "$2")" ]
+}
+
+nds_config_is_shipped_default() {
+    nds_files_match "$EMU_DIR/config/drastic.cfg" \
+        "$EMU_DIR/devices/$NDS_SHIPPED_PROFILE/config/drastic.cfg"
+}
+
+nds_device_marker_is() {
+    [ -f "$NDS_DEVICE_FILE" ] || return 1
+    [ "$(cat "$NDS_DEVICE_FILE")" = "$1" ]
+}
+
+# Seeding now runs on every launch that finds an untouched config, so skip the copy when the
+# bytes already agree rather than rewriting the SD card for nothing.
+nds_install_config_file() {
+    [ -f "$1" ] || return 0
+
+    if nds_files_match "$1" "$2"; then
+        return 0
+    fi
+
+    cp -f "$1" "$2"
+}
+
+# The profile is applied when the marker does not name it - a first launch, or a card moved to
+# another device - and whenever the live config is still the one the release archive ships. A
+# reinstall restores that file while the marker survives in userdata, which used to leave h700
+# devices running the Trimui joystick numbering with the DraStic menu on R1. Anything saved from
+# the DraStic menu is left alone, and a config that had been changed is kept as drastic.cfg.bak.
 nds_seed_device_config() {
     profile="$1"
     profile_dir="$EMU_DIR/devices/$profile"
+    live_config="$EMU_DIR/config/drastic.cfg"
 
     if [ ! -d "$profile_dir" ]; then
         echo "No DraStic profile named $profile, keeping the shipped config"
         return 0
     fi
 
-    if [ -f "$NDS_DEVICE_FILE" ] && [ "$(cat "$NDS_DEVICE_FILE")" = "$profile" ]; then
+    if [ -f "$live_config" ] && nds_device_marker_is "$profile" && ! nds_config_is_shipped_default; then
+        echo "Keeping the DraStic config already in place for $profile"
         return 0
     fi
 
     echo "Seeding DraStic config from the $profile profile"
 
-    if [ -f "$EMU_DIR/config/drastic.cfg" ]; then
-        cp -f "$EMU_DIR/config/drastic.cfg" "$NDS_USERDATA_DIR/drastic.cfg.bak"
+    if [ -f "$live_config" ] && ! nds_config_is_shipped_default; then
+        cp -f "$live_config" "$NDS_USERDATA_DIR/drastic.cfg.bak"
     fi
 
-    for name in drastic.cfg drastic.cf2; do
-        if [ -f "$profile_dir/config/$name" ]; then
-            cp -f "$profile_dir/config/$name" "$EMU_DIR/config/$name"
-        fi
-    done
-
-    if [ -f "$profile_dir/resources/settings.json" ]; then
-        cp -f "$profile_dir/resources/settings.json" "$EMU_DIR/resources/settings.json"
-    fi
+    nds_install_config_file "$profile_dir/config/drastic.cfg" "$live_config"
+    nds_install_config_file "$profile_dir/config/drastic.cf2" "$EMU_DIR/config/drastic.cf2"
+    nds_install_config_file "$profile_dir/resources/settings.json" "$EMU_DIR/resources/settings.json"
 
     echo "$profile" >"$NDS_DEVICE_FILE"
 }
@@ -222,10 +265,12 @@ nds_config_set() {
 }
 
 # The pak bind mounts Saves/NDS onto the emulator backup directory, so saves have to be
-# written in .sav format. Some device profiles ship 0, which writes .dsv instead.
+# written in .sav format. Every shipped profile enables it, so this only has to rescue configs
+# written before that was true and ones where DraStic itself turned it off.
 nds_sav_format_patch() {
     config_path="$EMU_DIR/config/drastic.cfg"
     [ -f "$config_path" ] || return 0
+    grep -q "^backup_use_sav_format = 1$" "$config_path" && return 0
 
     nds_config_set "$config_path" backup_use_sav_format 1
 }
