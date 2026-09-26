@@ -138,9 +138,9 @@
     "bg":"bg_vh_s0.png",
 
     "screen0_x":0,
-    "screen0_y":48,
+    "screen0_y":66,
     "screen0_w":464,
-    "screen0_h":384,
+    "screen0_h":348,
 
     "screen1_x":464,
     "screen1_y":144,
