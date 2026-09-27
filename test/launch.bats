@@ -188,18 +188,21 @@ h700_profiles() {
 }
 
 # The bug in issue 83: a Pak Store reinstall restores the shipped Trimui config while device.txt
-# survives in userdata, which used to put the DraStic menu on R1 (1032) instead of Menu (1035).
+# survives in userdata. Since NextUI rc11 the joystick numbers agree, so the screen orientation is
+# what tells the two apart.
 @test "a reinstall that restores the shipped config is re-seeded" {
     fake_pak h700 rg35xxsp
 
     nds_seed_device_config rg35xx-sp
     nds_sav_format_patch
     restore_shipped_config
-    [ "$(config_value "controls_b[CONTROL_INDEX_MENU]")" = "1032" ]
+    [ "$(config_value screen_orientation)" = "1" ]
 
     nds_seed_device_config rg35xx-sp
 
-    [ "$(config_value "controls_b[CONTROL_INDEX_MENU]")" = "1035" ]
+    [ "$(config_value screen_orientation)" = "0" ]
+    run diff "$EMU_DIR/config/drastic.cfg" "$(profile_config rg35xx-sp)"
+    [ "$status" -eq 0 ]
 }
 
 @test "a reinstall restores the profile settings.json" {
@@ -294,6 +297,125 @@ h700_profiles() {
     [ "$status" -eq 0 ]
 }
 
+joystick_bindings() {
+    grep '^controls_b\[' "$1"
+}
+
+# A config saved before NextUI rc11: the player's own settings with the old per-model numbers, so
+# the menu sits on button 11 (1035) and A on button 3 (1027).
+pre_rc11_config() {
+    sed -e 's/^controls_b\[CONTROL_INDEX_MENU\] = .*/controls_b[CONTROL_INDEX_MENU] = 1035/' \
+        -e 's/^controls_b\[CONTROL_INDEX_A\] = .*/controls_b[CONTROL_INDEX_A] = 1027/' \
+        -e 's/^controls_a\[CONTROL_INDEX_A\] = .*/controls_a[CONTROL_INDEX_A] = 97/' \
+        -e 's/^screen_swap = .*/screen_swap = 1/' \
+        "$(profile_config "$1")" >"$2"
+}
+
+@test "a pre-rc11 h700 config gets the profile joystick bindings" {
+    fake_pak h700 rg35xxsp
+    nds_seed_device_config rg35xx-sp
+    pre_rc11_config rg35xx-sp "$EMU_DIR/config/drastic.cfg"
+    cp "$EMU_DIR/config/drastic.cfg" "$BATS_TEST_TMPDIR/before.cfg"
+
+    nds_migrate_joystick_layout rg35xx-sp
+
+    [ "$(joystick_bindings "$EMU_DIR/config/drastic.cfg")" = "$(joystick_bindings "$(profile_config rg35xx-sp)")" ]
+    [ "$(config_value "controls_a[CONTROL_INDEX_A]")" = "97" ]
+    [ "$(config_value screen_swap)" = "1" ]
+    run diff "$NDS_JOYSTICK_BACKUP_DIR/drastic.cfg" "$BATS_TEST_TMPDIR/before.cfg"
+    [ "$status" -eq 0 ]
+    [ "$(cat "$NDS_JOYSTICK_LAYOUT_FILE")" = "trimui" ]
+}
+
+@test "per-game configs are moved to the rc11 joystick layout too" {
+    fake_pak h700 rg40xxh
+    nds_seed_device_config rg40xx-h
+    pre_rc11_config rg40xx-h "$EMU_DIR/config/Game.cfg"
+
+    nds_migrate_joystick_layout rg40xx-h
+
+    [ "$(config_value "controls_b[CONTROL_INDEX_MENU]" "$EMU_DIR/config/Game.cfg")" = "1032" ]
+    [ "$(config_value "controls_b[CONTROL_INDEX_A]" "$EMU_DIR/config/Game.cfg")" = "1025" ]
+    [ "$(config_value screen_swap "$EMU_DIR/config/Game.cfg")" = "1" ]
+    [ -f "$NDS_JOYSTICK_BACKUP_DIR/Game.cfg" ]
+}
+
+@test "a freshly seeded h700 config is not backed up by the joystick migration" {
+    fake_pak h700 rg40xxv
+    nds_seed_device_config rg40xx-v
+
+    nds_migrate_joystick_layout rg40xx-v
+
+    [ ! -d "$NDS_JOYSTICK_BACKUP_DIR" ]
+    [ "$(cat "$NDS_JOYSTICK_LAYOUT_FILE")" = "trimui" ]
+    run diff "$EMU_DIR/config/drastic.cfg" "$(profile_config rg40xx-v)"
+    [ "$status" -eq 0 ]
+}
+
+@test "the joystick migration runs only once" {
+    fake_pak h700 rg35xxsp
+    nds_seed_device_config rg35xx-sp
+    pre_rc11_config rg35xx-sp "$EMU_DIR/config/drastic.cfg"
+
+    nds_migrate_joystick_layout rg35xx-sp
+    remap_control "controls_b[CONTROL_INDEX_MENU]" 1033
+    nds_migrate_joystick_layout rg35xx-sp
+
+    [ "$(config_value "controls_b[CONTROL_INDEX_MENU]")" = "1033" ]
+}
+
+@test "the joystick migration leaves trimui configs alone" {
+    fake_pak tg5040 brick
+    pre_rc11_config rg35xx-sp "$EMU_DIR/config/drastic.cfg"
+    cp "$EMU_DIR/config/drastic.cfg" "$BATS_TEST_TMPDIR/before.cfg"
+
+    nds_migrate_joystick_layout trimui-brick
+
+    run diff "$EMU_DIR/config/drastic.cfg" "$BATS_TEST_TMPDIR/before.cfg"
+    [ "$status" -eq 0 ]
+    [ ! -f "$NDS_JOYSTICK_LAYOUT_FILE" ]
+}
+
+@test "the joystick migration skips an unknown profile" {
+    fake_pak h700 rg40xxv
+    pre_rc11_config rg40xx-v "$EMU_DIR/config/drastic.cfg"
+
+    nds_migrate_joystick_layout nonexistent
+
+    [ "$(config_value "controls_b[CONTROL_INDEX_MENU]")" = "1035" ]
+    [ ! -f "$NDS_JOYSTICK_LAYOUT_FILE" ]
+}
+
+@test "the joystick migration keeps the reference config as it ships" {
+    fake_pak h700 rg40xxv
+    cp "$REPO_DIR/drastic/config/drastic_original.cfg" "$EMU_DIR/config/drastic_original.cfg"
+
+    nds_migrate_joystick_layout rg40xx-v
+
+    run diff "$EMU_DIR/config/drastic_original.cfg" "$REPO_DIR/drastic/config/drastic_original.cfg"
+    [ "$status" -eq 0 ]
+}
+
+@test "copying joystick bindings rewrites only controls_b lines" {
+    fake_pak h700 rg35xxsp
+    pre_rc11_config rg35xx-sp "$BATS_TEST_TMPDIR/target.cfg"
+    echo "not_a_real_key = 5" >>"$BATS_TEST_TMPDIR/target.cfg"
+    grep -v '^controls_b\[' "$BATS_TEST_TMPDIR/target.cfg" >"$BATS_TEST_TMPDIR/expected.txt"
+
+    nds_config_copy_joystick "$(profile_config rg35xx-sp)" "$BATS_TEST_TMPDIR/target.cfg"
+
+    [ "$(grep -v '^controls_b\[' "$BATS_TEST_TMPDIR/target.cfg")" = "$(cat "$BATS_TEST_TMPDIR/expected.txt")" ]
+    [ "$(joystick_bindings "$BATS_TEST_TMPDIR/target.cfg")" = "$(joystick_bindings "$(profile_config rg35xx-sp)")" ]
+}
+
+@test "the joystick migration is safe under errexit" {
+    fake_pak h700 rg35xxsp
+    pre_rc11_config rg35xx-sp "$EMU_DIR/config/drastic.cfg"
+
+    run sh -ec '. "$REPO_DIR/launch.sh"; nds_init_env; nds_seed_device_config rg35xx-sp; nds_migrate_joystick_layout rg35xx-sp; nds_migrate_joystick_layout rg35xx-sp'
+    [ "$status" -eq 0 ]
+}
+
 # The shipped config being a byte copy of one profile is what lets seeding tell a fresh extract
 # of the pak apart from a config the player has saved.
 @test "the shipped config is a copy of the profile launch.sh names" {
@@ -335,21 +457,44 @@ h700_profiles() {
     done
 }
 
-# The original bug at the data layer: the shipped config binds the menu to Trimui button 8, which
-# is R1 on an h700, so an h700 running it opens the DraStic menu with R1.
-@test "profiles bind the menu to their own menu button" {
-    for profile in $(h700_profiles); do
-        [ "$(config_value "controls_b[CONTROL_INDEX_MENU]" "$(profile_config "$profile")")" = "1035" ]
-    done
-    for profile in trimui-brick trimui-smart-pro; do
+# NextUI rc11 puts MENU on SDL button 8 on every h700 model, the same number Trimui uses.
+@test "profiles bind the menu to the menu button" {
+    for profile in $(h700_profiles) trimui-brick trimui-smart-pro; do
         [ "$(config_value "controls_b[CONTROL_INDEX_MENU]" "$(profile_config "$profile")")" = "1032" ]
+    done
+}
+
+@test "every h700 profile uses the trimui numbers for the built-in buttons" {
+    brick="$(profile_config trimui-brick)"
+
+    for profile in $(h700_profiles); do
+        config="$(profile_config "$profile")"
+        for control in A B X Y L R START SELECT MENU; do
+            key="controls_b[CONTROL_INDEX_$control]"
+            [ "$(config_value "$key" "$config")" = "$(config_value "$key" "$brick")" ]
+        done
+    done
+}
+
+# rc11 leaves buttons 11 and 12 unused and has nothing above 14, and L2/R2 are triggers that rest at
+# the negative end of axes 2 and 5, so binding that direction would read as held all the time.
+@test "no h700 profile binds a joystick input rc11 never sends or always sends" {
+    for profile in $(h700_profiles); do
+        run awk -F' *= *' '/^controls_b\[/ {
+            v = $2 + 0
+            if (v == 1035 || v == 1036 || (v >= 1039 && v < 1088) || v == 1218 || v == 1221) {
+                print $1 " = " v
+                bad = 1
+            }
+        } END { exit bad }' "$(profile_config "$profile")"
+        [ "$status" -eq 0 ]
     done
 }
 
 @test "every h700 profile can navigate and leave the drastic menu" {
     for profile in $(h700_profiles); do
         config="$(profile_config "$profile")"
-        [ "$(config_value "controls_b[CONTROL_INDEX_UI_SELECT]" "$config")" = "1027" ]
+        [ "$(config_value "controls_b[CONTROL_INDEX_UI_SELECT]" "$config")" = "1025" ]
         [ "$(config_value "controls_b[CONTROL_INDEX_UI_BACK]" "$config")" != "65535" ]
         [ "$(config_value "controls_b[CONTROL_INDEX_UI_EXIT]" "$config")" != "65535" ]
     done
@@ -359,8 +504,8 @@ h700_profiles() {
 @test "every h700 profile puts quick save on R and quick load on L" {
     for profile in $(h700_profiles); do
         config="$(profile_config "$profile")"
-        [ "$(config_value "controls_b[CONTROL_INDEX_HOT_SAVE_STATE]" "$config")" = "1032" ]
-        [ "$(config_value "controls_b[CONTROL_INDEX_HOT_LOAD_STATE]" "$config")" = "1031" ]
+        [ "$(config_value "controls_b[CONTROL_INDEX_HOT_SAVE_STATE]" "$config")" = "1029" ]
+        [ "$(config_value "controls_b[CONTROL_INDEX_HOT_LOAD_STATE]" "$config")" = "1028" ]
     done
 }
 

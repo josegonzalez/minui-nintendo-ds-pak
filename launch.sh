@@ -22,6 +22,10 @@ NDS_POWER_CONTROL_PLATFORMS="tg5040 tg5050 my355 rg35xxplus miyoomini"
 # constant and the shipped bytes from drifting apart.
 NDS_SHIPPED_PROFILE=trimui-brick
 
+# NextUI rc11 gave every h700 model the Trimui SDL joystick numbering. Configs written for the
+# older per-model numbering are migrated once, and this value records that it happened.
+NDS_JOYSTICK_LAYOUT=trimui
+
 # NextUI reports the Trimui Brick as tg5040 with DEVICE=brick. Older MinUI builds
 # reported it as its own tg3040 platform with no DEVICE at all.
 nds_normalize_platform() {
@@ -42,6 +46,8 @@ nds_init_env() {
     NDS_USERDATA_DIR="$USERDATA_PATH/$NDS_USERDATA_NAME"
     NDS_SHARE_USERDATA_DIR="$SHARED_USERDATA_PATH/$NDS_USERDATA_NAME"
     NDS_DEVICE_FILE="$NDS_USERDATA_DIR/device.txt"
+    NDS_JOYSTICK_LAYOUT_FILE="$NDS_USERDATA_DIR/joystick-layout.txt"
+    NDS_JOYSTICK_BACKUP_DIR="$NDS_USERDATA_DIR/pre-rc11"
 
     TEMP_SCALING_FILE="$NDS_USERDATA_DIR/$TEMP_PREFIX$CPU_SCALING_GOVERNOR.txt"
     TEMP_SCALING_MIN_FREQ="$NDS_USERDATA_DIR/$TEMP_PREFIX$CPU_SCALING_MIN_FREQ.txt"
@@ -253,6 +259,63 @@ nds_seed_device_config() {
     echo "$profile" >"$NDS_DEVICE_FILE"
 }
 
+# Overwrite the joystick bindings of a config with the ones from another, leaving the keyboard
+# bindings and every other setting alone. Keys the source does not have are kept as they are.
+nds_config_copy_joystick() {
+    source_config="$1"
+    target_config="$2"
+
+    awk '
+        NR == FNR {
+            if ($0 ~ /^controls_b\[/) {
+                key = $0
+                sub(/ *=.*/, "", key)
+                bindings[key] = $0
+            }
+            next
+        }
+        {
+            key = $0
+            sub(/ *=.*/, "", key)
+            if ($0 ~ /^controls_b\[/ && key in bindings) {
+                print bindings[key]
+                next
+            }
+            print
+        }' "$source_config" "$target_config" >"$target_config.tmp"
+    mv -f "$target_config.tmp" "$target_config"
+}
+
+# Before NextUI rc11 the SDL button numbers on h700 depended on the model, and a config kept from
+# then leaves DraStic reading the wrong buttons. On the first h700 launch after the profiles moved
+# to the rc11 numbering, the joystick bindings of the global and per-game configs are replaced with
+# the profile's, and the originals are kept in userdata.
+nds_migrate_joystick_layout() {
+    profile="$1"
+    profile_config="$EMU_DIR/devices/$profile/config/drastic.cfg"
+
+    [ "${PLATFORM:-}" = "h700" ] || return 0
+    [ -f "$profile_config" ] || return 0
+    if [ -f "$NDS_JOYSTICK_LAYOUT_FILE" ] && [ "$(cat "$NDS_JOYSTICK_LAYOUT_FILE")" = "$NDS_JOYSTICK_LAYOUT" ]; then
+        return 0
+    fi
+
+    for config in "$EMU_DIR/config/"*.cfg; do
+        [ -f "$config" ] || continue
+        [ "${config##*/}" != "drastic_original.cfg" ] || continue
+        if nds_files_match "$config" "$profile_config"; then
+            continue
+        fi
+
+        echo "Moving ${config##*/} to the NextUI rc11 joystick layout"
+        mkdir -p "$NDS_JOYSTICK_BACKUP_DIR"
+        cp -f "$config" "$NDS_JOYSTICK_BACKUP_DIR/"
+        nds_config_copy_joystick "$profile_config" "$config"
+    done
+
+    echo "$NDS_JOYSTICK_LAYOUT" >"$NDS_JOYSTICK_LAYOUT_FILE"
+}
+
 nds_config_set() {
     config_path="$1"
     key="$2"
@@ -357,7 +420,9 @@ main() {
     nds_cpu_configure ondemand
     nds_buffer_size_patch
 
-    nds_seed_device_config "$(nds_device_profile "$PLATFORM" "${DEVICE:-}")"
+    profile="$(nds_device_profile "$PLATFORM" "${DEVICE:-}")"
+    nds_seed_device_config "$profile"
+    nds_migrate_joystick_layout "$profile"
     nds_sav_format_patch
 
     nds_migrate_cheats
