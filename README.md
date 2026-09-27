@@ -10,7 +10,7 @@ This pak is designed and tested on the following MinUI Platforms and devices:
 - `tg5050`: Trimui Smart Pro S
 - `h700`: Anbernic RG28XX, RG34XX, RG34XX SP, RG35XX Plus, RG35XX 2024, RG35XX H, RG35XX Pro, RG35XX SP, RG40XX H, RG40XX V, RG Cube XX and RG SP
 
-Use the correct platform for your device. The `h700` and `tg5050` platforms are provided by NextUI, so those devices need NextUI rather than stock MinUI.
+Use the correct platform for your device. The `h700` and `tg5050` platforms are provided by NextUI, so those devices need NextUI rather than stock MinUI. On `h700`, NextUI rc11 or later is required, as older releases number the buttons differently.
 
 ## Installation
 
@@ -42,6 +42,8 @@ Devices without a profile of their own use the closest one, chosen by whether th
 The profile is applied when the recorded device does not match, and also whenever the configuration is still the one the pak ships. Reinstalling the pak restores that shipped configuration, so the right profile is applied again on the next launch. Any remapping done inside the Drastic settings menu is kept across launches and across pak updates, and a configuration you had changed is kept as `drastic.cfg.bak` next to `device.txt` before it is replaced. To start over from your device's profile, delete `drastic/config/drastic.cfg`.
 
 Drastic also writes a per-game configuration to `drastic/config/<game>.cfg`, which overrides the global one. If a single game still has the wrong buttons after the profile is applied, delete that file.
+
+The `h700` profiles use the button numbers introduced in NextUI rc11, which match the Trimui ones. The first launch on `h700` after updating the pak replaces the joystick bindings in `drastic/config/drastic.cfg` and every per-game configuration with the ones from your device's profile, leaving all other settings alone. The previous files are kept in `/.userdata/h700/NDS-advanced-drastic/pre-rc11/`.
 
 ## Key Controls
 
