@@ -7,7 +7,7 @@ PUSH_PLATFORM ?= tg5040
 
 PLATFORMS := h700 tg5040 tg5050
 
-MINUI_POWER_CONTROL_VERSION := 1.1.0
+MINUI_POWER_CONTROL_VERSION := 4.0.0
 UNZIP_DEB_URL := https://archive.debian.org/debian/pool/main/u/unzip/unzip_6.0-23+deb10u2_arm64.deb
 
 clean:
